@@ -1,4 +1,4 @@
-__author__ = 'agensler'
+__author__ = 'Adam Gensler'
 
 from dxxtoolkit import dxx_sendto, dxx_unpack
 from my_functions import *

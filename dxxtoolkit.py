@@ -1,4 +1,4 @@
-__author__ = 'agensler'
+__author__ = 'Adam Gensler'
 
 
 import logging
