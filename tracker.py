@@ -11,6 +11,20 @@ import threading
 import time
 
 
+def get_external_ip():
+    logger.debug('entered get_external_ip')
+
+    # Determine this tracker's external IP address
+    try:
+        # TODO: make this a configurable command line option
+        ip_addr = socket.gethostbyname('retro-tracker.game-server.cc')
+        logger.debug('External ip: {0}'.format(ip_addr))
+        return ip_addr
+    except socket.error:
+        logger.exception('Unable to resolve external_ip')
+        return None
+
+
 def check_version(major, minor, micro):
     logger.debug('entered check_version')
     if (major, minor, micro) != (MAJOR_VERSION, MINOR_VERSION, MICRO_VERSION):
@@ -197,6 +211,13 @@ def game_info_response(data, address):
         active_games[key]['confirmed'] = 1
         logger.debug('Confirmed game ID {0} hosted by {1}'.format(
             active_games[key]['game_id'], key))
+
+        # Setup a udp relay so this game can appear on the Main tracker as well
+        # but only do it if we didn't learn this game from the Main tracker to
+        # begin with, that would be bad.
+        if active_games[key]['main_tracker'] == 0:
+            setup_udp_relay(key)
+
         return True
 
     # If the opcode for this game was 3, this is a full game info response
@@ -284,19 +305,8 @@ def game_list_request(data, address):
                 if s == ip_addr:
                     logger.debug('Internal host, attempting to '
                                  'swap IP address')
-
-                    # hostname to derive the external IP address of this
-                    # tracker for the purposes of sending the external ip
-                    # address in game_list_resp when an internal host starts a
-                    # game
-                    try:
-                        # TODO: make this a configurable command line option
-                        ip_addr = socket.\
-                            gethostbyname('retro-tracker.game-server.cc')
-                        logger.debug('External ip: {0}'.format(ip_addr))
-                    except socket.error:
-                        logger.exception('Unable to resolve external_ip')
-                        continue
+                    if external_ip:
+                        ip_addr = external_ip
 
             # build the response dict to send to dxx_send_game_list_response
             response_data = {}
@@ -335,6 +345,12 @@ def game_list_response(data, version):
     # up.
     global last_list_response_time
     last_list_response_time = int(time.time())
+
+    if game_data['ip'] == external_ip:
+        logger.debug('Received relayed game hosted by {0}:{1} from Main '
+                     'tracker, ignoring'.format(game_data['ip'],
+                                                game_data['port']))
+        return False
 
     # check the game version, make sure we can support it
     if not check_version(game_data['release_major'],
@@ -423,11 +439,203 @@ def stale_game(key):
             logger.info('Archived game ID {0} '
                         'hosted by {1}'.format(active_games[key]['game_id'],
                                                key))
-            del active_games[key]
     else:
         logger.info('Deleting game ID {0} hosted by {1}'.format(
             active_games[key]['game_id'], key))
-        del active_games[key]
+
+    # Clean up the relay sockets
+    if active_games[key]['relay_sock_id'] in udp_relay_sockets:
+        relay_sock_id = active_games[key]['relay_sock_id']
+
+        # First, remove any client sockets associated with this main relay
+        # socket id
+        for i in udp_relay_sockets[relay_sock_id]['clients']:
+            client_sock_id = udp_relay_sockets[relay_sock_id]['clients'][i]
+            logger.debug('Deleting client socket {0} from relay socket '
+                         '{1}'.format(client_sock_id, udp_relay_sockets[relay_sock_id]))
+            del udp_relay_sockets[client_sock_id]
+
+        # Remove the main relay socket now
+        logger.debug('Deleting main socket {0} from relay socket '
+                     'list'.format(relay_sock_id,
+                                   udp_relay_sockets[relay_sock_id]))
+        del udp_relay_sockets[relay_sock_id]
+        udp_relay_ports.append(relay_sock_id[1])
+    else:
+        logger.debug('Replay sock ID {0} not found in '
+                     'udp_reply_sockets'.format(
+            active_games[key]['relay_sock_id']))
+
+        logger.debug('Relay sockets still active: \n{0}'.format(
+            udp_relay_sockets))
+
+    # Remove the game from the active games dict
+    del active_games[key]
+
+
+def setup_udp_relay(key):
+    logger.debug('entered setup_udp_relay')
+
+    # Open a socket for this game, but only do so if we have available ports
+    # to handle this game
+    if len(udp_relay_ports) > 0:
+        try:
+            temp_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            temp_socket.bind(('', udp_relay_ports[0]))
+        except socket.error:
+            logger.exception('Unable to bind socket, cannot setup relay for '
+                             'game ID {0} hosted '
+                             'by {1}'.format(active_games[key]['game_id'],
+                                             key))
+            return False
+
+        sock_id = temp_socket.getsockname()
+
+        # Note this sock_id so we can clean up this relay socket once the game goes stale
+        active_games[key]['relay_sock_id'] = sock_id
+
+        udp_relay_sockets[sock_id] = {}
+        udp_relay_sockets[sock_id]['clients'] = {}
+        udp_relay_sockets[sock_id]['game_id'] = key
+        udp_relay_sockets[sock_id]['relay_addr'] = (active_games[key]['ip'],
+                                                    active_games[key]['port'])
+        udp_relay_sockets[sock_id]['relay_socket'] = None
+        udp_relay_sockets[sock_id]['socket'] = temp_socket
+
+        request_data = {'tracker_ver': TRACKER_PROTOCOL_VERSION,
+                        'version': active_games[key]['version'],
+                        'port': udp_relay_ports[0],
+                        'game_id': active_games[key]['game_id'],
+                        'release_major': active_games[key]['release_major'],
+                        'release_minor': active_games[key]['release_minor'],
+                        'release_micro': active_games[key]['release_micro']}
+
+        dxx_send_register(request_data,
+                          (main_tracker_address, main_tracker_port),
+                          udp_relay_sockets[sock_id]['socket'])
+
+        udp_relay_ports.pop(0)
+    else:
+        logger.error('No ports available to setup UDP relay for game ID {0} '
+                     'hosted by {1}'.format(active_games[key]['game_id'], key))
+        return False
+
+
+def process_udp_relay(data, address, socket_):
+    logger.debug('entered process_udp_relay')
+
+    sock_id = socket_.getsockname()
+
+    if sock_id not in udp_relay_sockets:
+        logger.debug('Socket ID {0} no longer in the '
+                     'socket list'.format(sock_id))
+        return False
+
+    if udp_relay_sockets[sock_id]['relay_socket'] == None:
+        logger.debug('Sock ID {0} is a main game host socket'.format(sock_id))
+
+        # If the address we got this incoming packet from was the main tracker
+        # IP and port send it to the game host
+        if (address == (main_tracker_address, main_tracker_port)):
+            logger.debug('This appears to be an incoming tracker request')
+            relay_addr = udp_relay_sockets[sock_id]['relay_addr']
+            relay_socket = udp_relay_sockets[sock_id]['socket']
+            udp_relay_sockets[sock_id]['pending_reqs'] = 1
+
+        # Else, if, we got this incoming packet from the game host itself, AND,
+        # we have a pending request from the tracker, relay this data to the
+        # tracker
+        elif (address == udp_relay_sockets[sock_id]['relay_addr'] and udp_relay_sockets[sock_id]['pending_reqs'] == 1):
+            logger.debug('This appears to be a tracker response')
+            relay_addr = (main_tracker_address, main_tracker_port)
+            relay_socket = udp_relay_sockets[sock_id]['socket']
+            udp_relay_sockets[sock_id]['pending_reqs'] = 0
+
+        # Else, if, we got this incoming packet from a client that is already
+        # know for this game host, go ahead and relay this packet to the game
+        # host through the socket that was opened specifically for this client
+        elif address in udp_relay_sockets[sock_id]['clients']:
+            logger.debug('This appears to be a client we already know about')
+            relay_addr = udp_relay_sockets[sock_id]['relay_addr']
+
+            # Retrieve the socket id from this client from the clients dict
+            # embedded in the dict for this main game host socket
+            client_sock_id = udp_relay_sockets[sock_id]['clients'][address]
+
+            # Relay through the socket for this specific client
+            relay_socket = udp_relay_sockets[client_sock_id]['socket']
+
+        # Else, if, we got this incoming packet from a client that we do not
+        # already know about, go ahead and create a socket for it and relay
+        # the data from this client to the game host, using this new socket
+        elif address not in udp_relay_sockets[sock_id]['clients']:
+            logger.debug('This appears to be a new client')
+            client_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            # TODO: add error handling here
+            client_socket.bind(('', 0))
+            client_sock_id = client_socket.getsockname()
+
+            # Update the main game host's client table with this address and
+            # socket pair so we can find it when this client sends another
+            # packeto the game host
+            udp_relay_sockets[sock_id]['clients'][address] = client_sock_id
+            logger.debug('Main game host socket entry updated with new client '
+                         '{0}: \n{1}'.format(address,
+                                             udp_relay_sockets[sock_id]))
+
+            # Create a new entry for this client.
+            #
+            # relay_addr = the IP address of this client
+            # relay_socket = the main game host socket
+            # socket = the socket opened specific for this client
+            udp_relay_sockets[client_sock_id] = {}
+            udp_relay_sockets[client_sock_id]['relay_addr'] = address
+            udp_relay_sockets[client_sock_id]['relay_socket'] = sock_id
+            udp_relay_sockets[client_sock_id]['socket'] = client_socket
+
+            logger.debug('New client socket entry created: \n{0}'.format(
+                udp_relay_sockets[client_sock_id]))
+
+            # Relay this client's traffic over to the game host
+            relay_addr = udp_relay_sockets[sock_id]['relay_addr']
+
+            # Relay through the socket for this specific client
+            relay_socket = udp_relay_sockets[client_sock_id]['socket']
+
+            logger.debug('relay addr - {0}'.format(relay_addr))
+            logger.debug('relay socket - {0}'.format(relay_socket))
+        else:
+            logger.exception('I should never get here, if I do, '
+                             'something is wrong')
+            return False
+
+    # Else, the socket we recieved this packet on has a relay_socket set which
+    # means this socket was created for client and the relay socket is the one
+    # the client is using to communicate with the game host, so, send the
+    # data to the relay address and relay socket specified by this socket id.
+    else:
+        # As a security check, we should make sure the IP address we're getting
+        # the data from is the same IP address this client is relay data to.
+        relay_addr = udp_relay_sockets[sock_id]['relay_addr']
+        relay_socket_id = udp_relay_sockets[sock_id]['relay_socket']
+        relay_socket = udp_relay_sockets[relay_socket_id]['socket']
+
+        if udp_relay_sockets[relay_socket_id]['relay_addr'] != address:
+            logger.exception('This packet game in from someone other than '
+                             'the original relay target, dropping')
+            return False
+
+    logger.debug('relay addr - {0}'.format(relay_addr))
+    logger.debug('relay socket - {0}'.format(relay_socket))
+
+
+    # Now, actually relay the data, which would be a pretty good idea
+    if dxx_sendto(data, relay_addr, relay_socket):
+        logger.debug('Relayed packet from '
+                     '{0} to {1}'.format(address, relay_addr))
+        return True
+    else:
+        return False
 
 
 ### Main Body ###
@@ -449,7 +657,7 @@ rfh = logging.handlers.RotatingFileHandler('tracker.log', maxBytes=1048576,
 rfh.setFormatter(formatter)
 
 logger.addHandler(rfh)
-logger.addHandler(ch)
+#logger.addHandler(ch)
 
 # handle command line arguments
 parser = argparse.ArgumentParser(description='Python-based DXX Tracker',
@@ -500,7 +708,8 @@ MICRO_VERSION = 1
 TRACKER_PROTOCOL_VERSION = 0
 GAME_VARIANTS = ('rebirth 0.58.1', 'retro 1.3')
 NEW_GAME_TEMPLATE = {'confirmed': 0, 'pending_info_reqs': 0, 'start_time': 0,
-                     'detailed': 0, 'netgame_proto': 0, 'main_tracker': 0}
+                     'detailed': 0, 'netgame_proto': 0, 'main_tracker': 0,
+                     'relay_sock_id': None}
 NON_RETRO_GAME_TEMPLATE = {'retro_proto': 0, 'alt_colors': 0,
                            'primary_dupe': 0, 'secondary_dupe': 0,
                            'secondary_cap': 0, 'born_burner': 0}
@@ -513,9 +722,13 @@ OPCODE_GAME_INFO_LITE_RESPONSE = 5
 OPCODE_GAME_LIST_RESPONSE = 22
 OPCODE_WEBUI_IPC = 99
 
+udp_relay_ports = [50000, 50001, 50002, 50003, 50004]
+udp_relay_sockets = {}
+
 # open a socket that will be used to communicate with DXX clients
 listen_ip_address = '0.0.0.0'
-listen_port = 42420
+# TODO: fix the port
+listen_port = 17210
 listen_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 listen_socket.bind((listen_ip_address, listen_port))
 
@@ -533,6 +746,10 @@ last_list_request_time = 0
 last_list_response_time = 0
 last_game_poll_time = 0
 
+# set the external IP address
+external_ip = get_external_ip()
+last_external_ip_time = time.time()
+
 logger.info('Tracker initialized')
 
 # try to load old, existing game data, in case we crash and reboot
@@ -546,10 +763,21 @@ if old_game_data:
 
 while True:
     socket_list = [listen_socket, d1x_socket, d2x_socket]
+
+    for i in udp_relay_sockets:
+        socket_list.append(udp_relay_sockets[i]['socket'])
+
     readable, writeable, exception = select.select(socket_list, [], [], 1)
 
     if readable:
         for i in readable:
+
+            # if this is on one of the relay sockets, handle accordingly
+            if i.getsockname() in udp_relay_sockets:
+                data, address = i.recvfrom(1024)
+                process_udp_relay(data, address, i)
+                continue
+
             data, address = i.recvfrom(1024)
             logger.info('Incoming packet from {0}:{1}, '
                         'data length: {2}'.format(address[0], address[1],
@@ -653,3 +881,7 @@ while True:
             logger.debug('Wrote out active_games: \n{0}'.format(active_games))
         else:
             logger.debug('Error writing out active games')
+
+    # if it has been 5 minutes, re-check the external IP address
+    if last_external_ip_time == 0 or (time.time() - last_external_ip_time >= 300):
+        external_ip = get_external_ip()
