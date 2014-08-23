@@ -452,7 +452,8 @@ def stale_game(key):
         for i in udp_relay_sockets[relay_sock_id]['clients']:
             client_sock_id = udp_relay_sockets[relay_sock_id]['clients'][i]
             logger.debug('Deleting client socket {0} from relay socket '
-                         '{1}'.format(client_sock_id, udp_relay_sockets[relay_sock_id]))
+                         '{1}'.format(client_sock_id,
+                                      udp_relay_sockets[relay_sock_id]))
             del udp_relay_sockets[client_sock_id]
 
         # Remove the main relay socket now
@@ -491,7 +492,8 @@ def setup_udp_relay(key):
 
         sock_id = temp_socket.getsockname()
 
-        # Note this sock_id so we can clean up this relay socket once the game goes stale
+        # Note this sock_id so we can clean up this
+        # relay socket once the game goes stale
         active_games[key]['relay_sock_id'] = sock_id
 
         udp_relay_sockets[sock_id] = {}
@@ -545,7 +547,8 @@ def process_udp_relay(data, address, socket_):
         # Else, if, we got this incoming packet from the game host itself, AND,
         # we have a pending request from the tracker, relay this data to the
         # tracker
-        elif (address == udp_relay_sockets[sock_id]['relay_addr'] and udp_relay_sockets[sock_id]['pending_reqs'] == 1):
+        elif (address == udp_relay_sockets[sock_id]['relay_addr'] and
+                udp_relay_sockets[sock_id]['pending_reqs'] == 1):
             logger.debug('This appears to be a tracker response')
             relay_addr = (main_tracker_address, main_tracker_port)
             relay_socket = udp_relay_sockets[sock_id]['socket']
@@ -727,8 +730,7 @@ udp_relay_sockets = {}
 
 # open a socket that will be used to communicate with DXX clients
 listen_ip_address = '0.0.0.0'
-# TODO: fix the port
-listen_port = 17210
+listen_port = 42420
 listen_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 listen_socket.bind((listen_ip_address, listen_port))
 
@@ -883,5 +885,6 @@ while True:
             logger.debug('Error writing out active games')
 
     # if it has been 5 minutes, re-check the external IP address
-    if last_external_ip_time == 0 or (time.time() - last_external_ip_time >= 300):
+    if (last_external_ip_time == 0 or
+            (time.time() - last_external_ip_time >= 300)):
         external_ip = get_external_ip()

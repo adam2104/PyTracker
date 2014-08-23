@@ -1,0 +1,8 @@
+dxx_client.py
+*.txt
+*.log
+*.log\.[0-9]
+.idea
+*.pyc
+tracker
+unit_test.py
