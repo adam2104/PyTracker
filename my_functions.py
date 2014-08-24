@@ -57,4 +57,4 @@ def my_load_file(filename):
 
 
 def get_variants():
-    return ('rebirth 0.58.1', 'retro 1.2', 'retro 1.3')
+    return ('unknown', 'rebirth 0.58.1', 'retro 1.3')

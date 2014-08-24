@@ -38,17 +38,13 @@ def determine_variant(versions):
 
     if (versions == (0, 58, 1, 0)):
         # dxx rebirth 0.58.1
-        return GAME_VARIANTS[0]
-
-    if (versions == (0, 58, 1, 2126) or versions == (0, 58, 1, 2127)):
-        # dxx retro 1.3
         return GAME_VARIANTS[1]
 
     if (versions == (0, 58, 1, 2130) or versions == (0, 58, 1, 2131)):
         # dxx retro 1.3
         return GAME_VARIANTS[2]
 
-    return False
+    return GAME_VARIANTS[0]
 
 
 def register_request(data, address):
@@ -216,7 +212,7 @@ def game_info_response(data, address):
 
         if (active_games[key]['variant'] == GAME_VARIANTS[0] or
                 active_games[key]['variant'] == GAME_VARIANTS[1]):
-            logger.debug('This appears to be a older rebirth or retro game')
+            logger.debug('This appears to be a older variant')
             active_games[key].update(LEGACY_GAME_TEMPLATE)
 
         # Capture approximate player join times
@@ -296,6 +292,7 @@ def game_list_request(data, address):
                     # game
                     try:
                         # TODO: make this a configurable command line option
+                        # TODO: resolve this regularly with the server hostname
                         ip_addr = socket.\
                             gethostbyname('retro-tracker.game-server.cc')
                         logger.debug('External ip: {0}'.format(ip_addr))
@@ -481,6 +478,8 @@ if isinstance(args.int_ip, list):
 # for it's list of games
 if args.query_main:
     try:
+        # TODO: re-resolve this address regularly
+        # TODO: make the address a tuple, and not two different variables
         main_tracker_address = socket.\
             gethostbyname('dxxtracker.reenigne.net')
         main_tracker_port = 42420
