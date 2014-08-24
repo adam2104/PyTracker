@@ -359,8 +359,8 @@ def build_html_detailed_stats(data, mode):
 
     # fifth column
 
-    # display retro specific stuff only if its a retro game
-    if data['variant'] == GAME_VARIANTS[1]:
+    # display retro 1.3+ specific stuff only if its a retro game
+    if data['variant'] == GAME_VARIANTS[2]:
 
         # retro proto
         if data['retro_proto'] > 0:
@@ -729,8 +729,7 @@ ITEM_LIST = ('Laser Upgrade', 'Quad Lasers', 'Vulcan Cannon', 'Vulcan Ammo',
              'Flash Missiles', 'Guided Missiles', 'Smart Mines',
              'Mercury Missiles', 'Earthshaker Missiles', 'Afterburners',
              'Ammo Rack', 'Energy Converter', 'Headlight')
-GAME_VARIANTS = ('rebirth 0.58.1', 'retro 1.3')
-
+GAME_VARIANTS = get_variants()
 
 for i in ['tracker', 'tracker/archive', 'tracker/archive_data',
           'tracker/archive_data/old']:

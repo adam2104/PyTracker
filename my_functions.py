@@ -36,6 +36,7 @@ def my_time(data):
     formatted_time = time.strftime("%m-%d-%Y-%H-%M-%S", time.gmtime(data))
     return formatted_time
 
+
 def my_load_file(filename):
     logger.debug('entered my_load_file')
 
@@ -53,3 +54,7 @@ def my_load_file(filename):
         return False
 
     return data
+
+
+def get_variants():
+    return ('rebirth 0.58.1', 'retro 1.2', 'retro 1.3')

@@ -40,9 +40,13 @@ def determine_variant(versions):
         # dxx rebirth 0.58.1
         return GAME_VARIANTS[0]
 
-    if (versions == (0, 58, 1, 2130) or versions == (0, 58, 1, 2131)):
+    if (versions == (0, 58, 1, 2126) or versions == (0, 58, 1, 2127)):
         # dxx retro 1.3
         return GAME_VARIANTS[1]
+
+    if (versions == (0, 58, 1, 2130) or versions == (0, 58, 1, 2131)):
+        # dxx retro 1.3
+        return GAME_VARIANTS[2]
 
     return False
 
@@ -210,9 +214,10 @@ def game_info_response(data, address):
                         active_games[key]['netgame_proto'])
             active_games[key]['variant'] = determine_variant(versions)
 
-        if active_games[key]['variant'] == GAME_VARIANTS[0]:
-            logger.debug('This appears to be a rebirth game')
-            active_games[key].update(NON_RETRO_GAME_TEMPLATE)
+        if (active_games[key]['variant'] == GAME_VARIANTS[0] or
+                active_games[key]['variant'] == GAME_VARIANTS[1]):
+            logger.debug('This appears to be a older rebirth or retro game')
+            active_games[key].update(LEGACY_GAME_TEMPLATE)
 
         # Capture approximate player join times
         for i in range(0, 8):
@@ -498,10 +503,10 @@ MAJOR_VERSION = 0
 MINOR_VERSION = 58
 MICRO_VERSION = 1
 TRACKER_PROTOCOL_VERSION = 0
-GAME_VARIANTS = ('rebirth 0.58.1', 'retro 1.3')
+GAME_VARIANTS = get_variants()
 NEW_GAME_TEMPLATE = {'confirmed': 0, 'pending_info_reqs': 0, 'start_time': 0,
                      'detailed': 0, 'netgame_proto': 0, 'main_tracker': 0}
-NON_RETRO_GAME_TEMPLATE = {'retro_proto': 0, 'alt_colors': 0,
+LEGACY_GAME_TEMPLATE = {'retro_proto': 0, 'alt_colors': 0,
                            'primary_dupe': 0, 'secondary_dupe': 0,
                            'secondary_cap': 0, 'born_burner': 0}
 
