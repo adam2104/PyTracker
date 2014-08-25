@@ -3,9 +3,11 @@ __author__ = 'Adam Gensler'
 import json
 import logging
 import os
+import socket
 import time
 
 logger = logging.getLogger('dxx_logger.my_functions')
+
 
 def my_mkdir(dir_):
     logger.debug('entered my_mkdir')
@@ -58,3 +60,12 @@ def my_load_file(filename):
 
 def get_variants():
     return ('unknown', 'rebirth 0.58.1', 'retro 1.3')
+
+
+def my_gethostbyname(hostname):
+    logger.debug('entered my_gethostbyname')
+    try:
+        return socket.gethostbyname(hostname)
+    except socket.error:
+        logger.exception('Unable to resolve hostname')
+        return False

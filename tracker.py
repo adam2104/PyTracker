@@ -282,23 +282,10 @@ def game_list_request(data, address):
             # determine which IP address to return to client
             ip_addr = active_games[i]['ip']
             for s in int_ip_list:
-                if s == ip_addr:
-                    logger.debug('Internal host, attempting to '
-                                 'swap IP address')
-
-                    # hostname to derive the external IP address of this
-                    # tracker for the purposes of sending the external ip
-                    # address in game_list_resp when an internal host starts a
-                    # game
-                    try:
-                        # TODO: make this a configurable command line option
-                        # TODO: resolve this regularly with the server hostname
-                        ip_addr = socket.\
-                            gethostbyname('retro-tracker.game-server.cc')
-                        logger.debug('External ip: {0}'.format(ip_addr))
-                    except socket.error:
-                        logger.exception('Unable to resolve external_ip')
-                        continue
+                if s == ip_addr and external_ip:
+                    logger.debug('Internal host, swapped IP {0} for '
+                                 '{1}'.format(ip_addr, external_ip))
+                    ip_addr = external_ip
 
             # build the response dict to send to dxx_send_game_list_response
             response_data = {}
@@ -456,14 +443,33 @@ logger.addHandler(ch)
 # handle command line arguments
 parser = argparse.ArgumentParser(description='Python-based DXX Tracker',
                                  prog='tracker')
-parser.add_argument('-i', '--int_ip', dest='int_ip', type=str,
-                    nargs='+', help='IP address(es) of internal host(s).')
-parser.add_argument('-q', '--query_main', action='store_true',
-                    help='Query the main tracker for it\'s list of games.')
+parser.add_argument('--int_ip', dest='int_ip', nargs='+',
+                    help='IP address(es) of internal host(s), requires '
+                         '--hostname')
+parser.add_argument('--ext_ip', dest='ext_ip', help='External IP / Hostname '
+                                                    'for this tracker')
+parser.add_argument('--peer_hostname', dest='peer_hostname',
+                    help='IP / Hostname of peer tracker to query for '
+                         'games list')
+parser.add_argument('--peer_port', dest='peer_port',
+                    help='Port of peer tracker to query for games list '
+                         '(default: 42420)', default=42420)
 args = parser.parse_args()
 
 int_ip_list = []
 if isinstance(args.int_ip, list):
+    # Make sure the user also specified and external hostname to be swapped out
+    # for the list of internal IP addresses specified
+    if not args.ext_ip:
+        parser.error('--ext_ip must also be specified when using --int_ip')
+    else:
+        external_ip = my_gethostbyname(args.ext_ip)
+        if external_ip:
+            logger.info('External IP {0} will be used when hosting internal '
+                        'games to external players'.format(external_ip))
+        else:
+            logger.error('Unable to resolve hostname, will try again later')
+
     for s in args.int_ip:
         try:
             socket.inet_aton(s)
@@ -474,24 +480,17 @@ if isinstance(args.int_ip, list):
             logger.error('\'{0}\' is not a valid IP address and will be '
                          'ignored'.format(s))
 
-# Determine what we should be doing as far as querying the main tracker
-# for it's list of games
-if args.query_main:
-    try:
-        # TODO: re-resolve this address regularly
-        # TODO: make the address a tuple, and not two different variables
-        main_tracker_address = socket.\
-            gethostbyname('dxxtracker.reenigne.net')
-        main_tracker_port = 42420
-        logger.debug('Main tracker address - {0}:{1}'.format(
-            main_tracker_address, main_tracker_port))
-    except socket.error:
-        logger.exception('Unable to determine main tracker IP address, '
-                         'tracker will not be queried.')
-        main_tracker_address = False
+if args.peer_hostname:
+    peer_address = my_gethostbyname(args.peer_hostname)
+    if peer_address:
+        peer_address = (peer_address, args.peer_port)
+        logger.info('Peer tracker address at {0} will be queried for '
+                    'games'.format(peer_address))
+    else:
+        logger.error('Unable to resolve hostname of peer tracker, will try '
+                     'again later')
 else:
-    logger.info('Main Tracker will not be queried.')
-    main_tracker_address = False
+    peer_address = False
 
 # constants
 MAX_PLAYERS = 8
@@ -505,9 +504,9 @@ TRACKER_PROTOCOL_VERSION = 0
 GAME_VARIANTS = get_variants()
 NEW_GAME_TEMPLATE = {'confirmed': 0, 'pending_info_reqs': 0, 'start_time': 0,
                      'detailed': 0, 'netgame_proto': 0, 'main_tracker': 0}
-LEGACY_GAME_TEMPLATE = {'retro_proto': 0, 'alt_colors': 0,
-                           'primary_dupe': 0, 'secondary_dupe': 0,
-                           'secondary_cap': 0, 'born_burner': 0}
+LEGACY_GAME_TEMPLATE = {'retro_proto': 0, 'alt_colors': 0, 'primary_dupe': 0,
+                        'secondary_dupe': 0, 'secondary_cap': 0,
+                        'born_burner': 0}
 
 OPCODE_REGISTER = 0
 OPCODE_UNREGISTER_OR_VERSION_DENY = 1
@@ -536,6 +535,7 @@ stale_games = []
 last_list_request_time = 0
 last_list_response_time = 0
 last_game_poll_time = 0
+last_address_lookup_time = time.time()
 
 logger.info('Tracker initialized')
 
@@ -583,8 +583,8 @@ while True:
                     game_info_response(data, address)
                 elif data[0] == OPCODE_GAME_LIST_RESPONSE:
                     # Make sure this game from the tracker and no some bad
-                    # dude trying to do some malicious
-                    if address[0] != main_tracker_address:
+                    # dude trying to do something malicious
+                    if address != peer_address:
                         logger.error('Received game list response from '
                                      'someone other than the tracker')
                         continue
@@ -613,20 +613,17 @@ while True:
         stale_game(i)
     stale_games = []
 
-    # Query the main tracker for games, if appropriate.
-    if (main_tracker_address and
+    # Query the peer tracker for games, if appropriate.
+    if (peer_address and
             (last_list_request_time == 0 or
             (time.time() - last_list_request_time >= 10))):
-        logger.debug('Retrieving new game list from main tracker')
+        logger.debug('Retrieving new game list from peer tracker '
+                     '{0}'.format(peer_address))
         last_list_request_time = time.time()
 
-        dxx_send_game_list_request(1,
-                                   (main_tracker_address, main_tracker_port),
-                                   d1x_socket)
+        dxx_send_game_list_request(1, peer_address, d1x_socket)
         time.sleep(0.025)
-        dxx_send_game_list_request(2,
-                                   (main_tracker_address, main_tracker_port),
-                                   d2x_socket)
+        dxx_send_game_list_request(2, peer_address, d2x_socket)
 
     # if it has been 5 seconds, poll the active games for stats
     if last_game_poll_time == 0 or (time.time() - last_game_poll_time >= 5):
@@ -657,3 +654,26 @@ while True:
             logger.debug('Wrote out active_games: \n{0}'.format(active_games))
         else:
             logger.debug('Error writing out active games')
+
+        # Re-query external IP addresses every 5 minutes in case it changes
+        # since the last time we started
+        if (time.time() - last_address_lookup_time >= 300):
+            if args.ext_ip:
+                external_ip = my_gethostbyname(args.ext_ip)
+                if external_ip:
+                    logger.info('External IP {0} will be used when hosting '
+                                'internal games to external '
+                                'players'.format(external_ip))
+                else:
+                    logger.error('Unable to resolve hostname, will '
+                                 'try again later')
+
+            if args.peer_hostname:
+                peer_address = my_gethostbyname(args.peer_hostname)
+                if peer_address:
+                    peer_address = (peer_address, args.peer_port)
+                    logger.info('Peer tracker address at {0} will be queried '
+                                'for games'.format(peer_address))
+                else:
+                    logger.error('Unable to resolve hostname of peer tracker, '
+                                 'will try again later')
