@@ -722,3 +722,5 @@ while True:
                 else:
                     logger.error('Unable to resolve hostname of peer tracker, '
                                  'will try again later')
+
+            last_address_lookup_time = time.time()
