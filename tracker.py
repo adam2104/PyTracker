@@ -136,7 +136,7 @@ def unregister_request(data, address):
     # likely not match the ip:port stored in the active_games dictionary.
     # As such, we need to loop through all the active games, look for the
     # game_id specified in the unregister message, check it against the IP
-    # address the unregister game from and hope for the best.
+    # address the unregister came from and hope for the best.
     for i in active_games:
         if ((active_games[i]['game_id'] == game_data['game_id']) and
                 (active_games[i]['ip'] == address[0])):
@@ -281,7 +281,7 @@ def version_deny(address):
     active_games[key]['netgame_proto'] = game_data['netgame_proto']
 
     logger.debug('Netgame protocol for game ID {0} host by {1} '
-                 'set to {2}: '.format(active_games[key]['game_id'],
+                 'set to {2}'.format(active_games[key]['game_id'],
                                        key,
                                        active_games[key]['netgame_proto']))
 
@@ -676,8 +676,18 @@ while True:
             else:
                 game_info_request(1, i)
 
-            # Flag games haven't responded for 60 seconds
-            if active_games[i]['pending_info_reqs'] > 12:
+            # If the game hasn't responded to an Info Request for 6 intervals,
+            # close and reopen the per-game socket in an attempt to get data
+            # from the game.
+            if active_games[i]['pending_info_reqs'] == 6:
+                logger.debug('Game ID {0} hosted by {1} is not responding, '
+                             'closing and reopening game '
+                             'socket'.format(active_games[i]['game_id'], i))
+                active_games[i]['socket'].close()
+                active_games[i]['socket'] = allocate_socket()
+            # If the game hasn't responded in more than a minute, perhaps it
+            # really is gone and we should mark it stale
+            elif active_games[i]['pending_info_reqs'] > 12:
                 logger.debug('Game ID {0} hosted by {1} is stale'.format(
                     active_games[i]['game_id'], i))
                 if i not in stale_games:
