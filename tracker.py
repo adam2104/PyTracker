@@ -108,12 +108,8 @@ def register_request(data, address):
     active_games[key].update(game_data)
     active_games[key]['ip'] = address[0]
     active_games[key]['socket'] = allocate_socket()
-
-    # send register ack, then send it two more times just in case
-    dxx_send_register_response(address, listen_socket)
-    for i in range(1, 3):
-        threading.Timer(i * 0.025, dxx_send_register_response,
-                        [address, listen_socket]).start()
+    active_games[key]['register_ip'] = address[0]
+    active_games[key]['register_port'] = address[1]
 
     # send a game_info_lite request
     game_info_request(0, key)
@@ -207,8 +203,21 @@ def game_info_response(data, address):
     # those games on the next pass around.
     if active_games[key]['confirmed'] == 0:
         active_games[key]['confirmed'] = 1
+
+        if active_games[key]['main_tracker'] == 0:
+            # This must be a game registered directly with us, and we've just
+            # confirmed it, so, send the register ACK at this point
+            register_address = (active_games[key]['register_ip'],
+                                active_games[key]['register_port'])
+
+            dxx_send_register_response(register_address, listen_socket)
+            for i in range(1, 3):
+                threading.Timer(i * 0.025, dxx_send_register_response,
+                                [register_address, listen_socket]).start()
+
         logger.debug('Confirmed game ID {0} hosted by {1}'.format(
             active_games[key]['game_id'], key))
+
         return True
 
     # If the opcode for this game was 3, this is a full game info response
