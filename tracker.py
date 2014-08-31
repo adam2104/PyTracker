@@ -411,6 +411,11 @@ def stale_game(key):
     if not active_game_check(key):
         return False
 
+    # Because this is a stale game we're about to archive, or delete, go ahead
+    # and close the socket and then delete the socket from the game list
+    active_games[key]['socket'].close()
+    del active_games[key]['socket']
+
     # archive games that are confirmed, have detailed stats, have a player1
     # whose name is greater than 1, and has been started, and has been up for
     # at least 5 minutes
@@ -434,14 +439,10 @@ def stale_game(key):
             logger.info('Archived game ID {0} '
                         'hosted by {1}'.format(active_games[key]['game_id'],
                                                key))
-
-            active_games[key]['socket'].close()
             del active_games[key]
     else:
         logger.info('Deleting game ID {0} hosted by {1}'.format(
             active_games[key]['game_id'], key))
-
-        active_games[key]['socket'].close()
         del active_games[key]
 
 
