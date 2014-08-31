@@ -47,6 +47,17 @@ def determine_variant(versions):
     return GAME_VARIANTS[0]
 
 
+def allocate_socket(address = '', port = 0):
+    logger.debug('entered allocate_socket')
+
+    socket_ = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    socket_.bind((address, port))
+
+    logger.debug('Allocated socket {0}'.format(socket_.getsockname()))
+
+    return socket_
+
+
 def register_request(data, address):
     logger.debug('entered register_request')
 
@@ -96,6 +107,7 @@ def register_request(data, address):
     active_games[key].update(NEW_GAME_TEMPLATE)
     active_games[key].update(game_data)
     active_games[key]['ip'] = address[0]
+    active_games[key]['socket'] = allocate_socket()
 
     # send register ack, then send it two more times just in case
     dxx_send_register_response(address, listen_socket)
@@ -150,7 +162,7 @@ def game_info_request(req_type, key):
 
     dxx_send_game_info_request(active_games[key]['version'], req_type,
                                active_games[key]['netgame_proto'],
-                               address, listen_socket)
+                               address, active_games[key]['socket'])
 
     active_games[key]['pending_info_reqs'] += 1
 
@@ -358,6 +370,7 @@ def game_list_response(data, version):
     active_games[key].update(game_data)
     active_games[key]['version'] = version
     active_games[key]['main_tracker'] = 1
+    active_games[key]['socket'] = allocate_socket()
 
     logger.debug('Added new game ID {0} hosted by {1} to '
                  'active_games: \n{2}'.format(active_games[key]['game_id'],
@@ -412,10 +425,14 @@ def stale_game(key):
             logger.info('Archived game ID {0} '
                         'hosted by {1}'.format(active_games[key]['game_id'],
                                                key))
+
+            active_games[key]['socket'].close()
             del active_games[key]
     else:
         logger.info('Deleting game ID {0} hosted by {1}'.format(
             active_games[key]['game_id'], key))
+
+        active_games[key]['socket'].close()
         del active_games[key]
 
 
@@ -545,11 +562,19 @@ if old_game_data:
     active_games.update(old_game_data)
     logger.debug('Loaded old game data: \n{0}'.format(active_games))
 
-### debugging
-#active_games['127.0.0.1:42424'] = {'alt_colors': 1, 'player2connected': 0, 'team1_name': '', 'port': 42424, 'player7deaths': 0, 'spawn_style': 3, 'player0kills': 0, 'max_time': 600, 'player5deaths': 0, 'player0name': 'arch', 'max_players': 8, 'status': 1, 'player3kills': 0, 'difficulty': 4, 'player4connected': 0, 'player7name': '', 'player1kill_table': [0, 0, 0, 0, 0, 0, 0, 0], 'player7kill_table': [0, 0, 0, 0, 0, 0, 0, 0], 'player5time': 0, 'player4kill_table': [0, 0, 0, 0, 0, 0, 0, 0], 'player5kills': 0, 'packet_loss_prevention': 1, 'start_time': 1407465207.975702, 'player0kill_table': [0, 0, 0, 0, 0, 0, 0, 0], 'pending_info_reqs': 1, 'flags': 4, 'secondary_dupe': 0, 'player1name': 'foobar', 'monitor_vector': 0, 'main_tracker': 0, 'team0_kills': 0, 'level_num': 1, 'retro_proto': 1, 'player7time': 0, 'mission_title': 'The Manes', 'player1time': 0, 'player4time': 0, 'player5name': '', 'segments_checksum': 35373, 'show_enemy_names': 1, 'allow_marker_view': 0, 'player0suicides': 0, 'secondary_cap': 0, 'short_packets': 4, 'player3deaths': 0, 'level_time': 0, 'player1connected': 0, 'player2name': '', 'respawn_concs': 0, 'mission_name': 'manes', 'player0deaths': 0, 'team0_name': '', 'release_major': 0, 'packets_sec': 30, 'players': 1, 'reactor_life': 300, 'player7kills': 0, 'player1deaths': 0, 'player5suicides': 0, 'player2time': 0, 'fair_colors': 0, 'player2deaths': 0, 'detailed': 1, 'release_minor': 58, 'mode': 0, 'player3kill_table': [0, 0, 0, 0, 0, 0, 0, 0], 'team1_kills': 0, 'player7connected': 0, 'player0time': 1408465213.008564, 'always_lighting': 0, 'player2kills': 0, 'ip': '127.0.0.1', 'player3connected': 0, 'player2kill_table': [0, 0, 0, 0, 0, 0, 0, 0], 'player1kills': 0, 'player4name': '', 'player5kill_table': [0, 0, 0, 0, 0, 0, 0, 0], 'release_micro': 1, 'bright_ships': 1, 'player4deaths': 0, 'game_id': 22094, 'player3suicides': 0, 'netgame_name': 'testing', 'confirmed': 1, 'player6deaths': 0, 'player6connected': 0, 'player0connected': 1, 'player4kills': 0, 'kill_goal': 20, 'primary_dupe': 0, 'player4suicides': 0, 'player5connected': 0, 'player1suicides': 0, 'player6kill_table': [0, 0, 0, 0, 0, 0, 0, 0], 'player6suicides': 0, 'refuse_players': 0, 'player6kills': 0, 'variant': 'retro 1.3', 'netgame_proto': 2130, 'player2suicides': 0, 'num_players': 1, 'allowed_items': 8191, 'team_vector': 0, 'player3name': '', 'player7suicides': 0, 'player6time': 0, 'version': 1, 'allow_colored_lights': 0, 'no_friendly_fire': 1, 'player3time': 0, 'tracker_ver': 0, 'player6name': ''}
+    # Allocate sockets for the loaded games
+    for i in active_games:
+        active_games[i]['socket'] = allocate_socket()
 
 while True:
     socket_list = [listen_socket, d1x_socket, d2x_socket]
+
+    # Add any new game sockets to the socket_list so that we can handle
+    # incoming packets from those games
+    for i in active_games:
+        if active_games[i]['socket'] not in socket_list:
+            socket_list.append(active_games[i]['socket'])
+
     readable, writeable, exception = select.select(socket_list, [], [], 1)
 
     if readable:
@@ -641,8 +666,8 @@ while True:
             else:
                 game_info_request(1, i)
 
-            # flag games that are not responding to info requests
-            if active_games[i]['pending_info_reqs'] > 5:
+            # Flag games haven't responded for 60 seconds
+            if active_games[i]['pending_info_reqs'] > 12:
                 logger.debug('Game ID {0} hosted by {1} is stale'.format(
                     active_games[i]['game_id'], i))
                 if i not in stale_games:
@@ -650,7 +675,18 @@ while True:
 
         # Write out the active_games dict so the web interface can render it
         filename = 'gamelist.txt'
-        if my_write_file(json.dumps(active_games), filename):
+        games_to_write = {}
+
+        # Only write out games that are confirmed
+        for i in active_games:
+            if active_games[i]['confirmed']:
+                games_to_write[i] = {}
+                games_to_write[i].update(active_games[i])
+
+                # Drop the socket data so we can json dump this data later
+                del games_to_write[i]['socket']
+
+        if my_write_file(json.dumps(games_to_write), filename):
             logger.debug('Wrote out active_games: \n{0}'.format(active_games))
         else:
             logger.debug('Error writing out active games')
