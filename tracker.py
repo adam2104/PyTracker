@@ -142,7 +142,10 @@ def unregister_request(data, address):
                 (active_games[i]['ip'] == address[0])):
             logger.info('Unregistering game ID {0} hosted by {1}'.format(
                 game_data['game_id'], i))
-            stale_game(i)
+
+            # add this game to the stale_games list so we can handle it on the
+            # next garbage collection loop
+            stale_games.append(i)
             return True
     return False
 
@@ -412,8 +415,9 @@ def stale_game(key):
         return False
 
     # Because this is a stale game we're about to archive, or delete, go ahead
-    # and close the socket and then delete the socket from the game list
-    active_games[key]['socket'].close()
+    # and detach the socket and then delete the socket from the game list
+    active_games[key]['socket'].detach()
+    stale_sockets.append(active_games[key]['socket'])
     del active_games[key]['socket']
 
     # archive games that are confirmed, have detailed stats, have a player1
@@ -559,6 +563,8 @@ for s in ['tracker', 'tracker/archive_data']:
 
 active_games = {}
 stale_games = []
+stale_sockets = []
+
 last_list_request_time = 0
 last_list_response_time = 0
 last_game_poll_time = 0
@@ -589,7 +595,12 @@ while True:
 
     if readable:
         for i in readable:
-            data, address = i.recvfrom(1024)
+            data, address = dxx_recvfrom(i)
+
+            if data == False and address == False:
+                logger.debug('Error reading data from socket {0}'.format(i))
+                continue
+
             logger.info('Incoming packet from {0}:{1}, '
                         'data length: {2}'.format(address[0], address[1],
                         len(data)))
@@ -648,6 +659,12 @@ while True:
         stale_game(i)
     stale_games = []
 
+    # close game sockets that have been marked stale
+    for i in stale_sockets:
+        logger.debug('Close stale socket {0}'.format(i))
+        i.close()
+    stale_sockets = []
+
     # Query the peer tracker for games, if appropriate.
     if (peer_address and
             (last_list_request_time == 0 or
@@ -683,8 +700,13 @@ while True:
                 logger.debug('Game ID {0} hosted by {1} is not responding, '
                              'closing and reopening game '
                              'socket'.format(active_games[i]['game_id'], i))
-                active_games[i]['socket'].close()
+
+                # don't actually close the socket, detach it, mark it stale to
+                # avoid causing a fderror in the select loop
+                active_games[i]['socket'].detach()
+                stale_sockets.append(active_games[i]['socket'])
                 active_games[i]['socket'] = allocate_socket()
+
             # If the game hasn't responded in more than a minute, perhaps it
             # really is gone and we should mark it stale
             elif active_games[i]['pending_info_reqs'] > 12:

@@ -31,6 +31,19 @@ def dxx_sendto(buf, address, socket_):
         return False
 
 
+def dxx_recvfrom(socket_):
+    logger.debug('entered dxx_recvfrom')
+
+    try:
+        data, address = socket_.recvfrom(1024)
+    except (os.error, socket.error):
+        logger.exception('Error occurred while reading from the socket')
+        data = False
+        address = False
+
+    return data, address
+
+
 def dxx_unpack(unpack_string, data):
     logger.debug('entered dxx_unpack')
     try:
