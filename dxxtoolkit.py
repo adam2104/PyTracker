@@ -151,11 +151,11 @@ def dxx_process_game_info_response(data):
     if len(data) == 73:
         # game_info_lite response from DXX Rebirth and Retro
         game_data['game_id'] = unpacked_data[4]
-        game_data['netgame_name'] = unpacked_data[5].decode().\
+        game_data['netgame_name'] = unpacked_data[5].decode(errors='ignore').\
             replace('\x00', '')
-        game_data['mission_title'] = unpacked_data[6].decode().\
+        game_data['mission_title'] = unpacked_data[6].decode(errors='ignore').\
             replace('\x00', '')
-        game_data['mission_name'] = unpacked_data[7].decode().\
+        game_data['mission_name'] = unpacked_data[7].decode(errors='ignore').\
             replace('\x00', '')
         game_data['level_num'] = unpacked_data[8]
         game_data['mode'] = unpacked_data[9]
@@ -167,11 +167,11 @@ def dxx_process_game_info_response(data):
         game_data['flags'] = unpacked_data[15]
     else:
         # Full game_info response from DXX Rebirth and Retro
-        game_data['netgame_name'] = unpacked_data[52].decode().\
+        game_data['netgame_name'] = unpacked_data[52].decode(errors='ignore').\
             replace('\x00', '')
-        game_data['mission_title'] = unpacked_data[53].decode().\
+        game_data['mission_title'] = unpacked_data[53].decode(errors='ignore').\
             replace('\x00', '')
-        game_data['mission_name'] = unpacked_data[54].decode().\
+        game_data['mission_name'] = unpacked_data[54].decode(errors='ignore').\
             replace('\x00', '')
         game_data['level_num'] = unpacked_data[55]
         game_data['mode'] = unpacked_data[56]
@@ -195,9 +195,9 @@ def dxx_process_game_info_response(data):
         game_data['show_enemy_names'] = unpacked_data[68]
         game_data['bright_ships'] = unpacked_data[69]
         game_data['spawn_style'] = unpacked_data[70]
-        game_data['team0_name'] = unpacked_data[71][0:8].decode().\
+        game_data['team0_name'] = unpacked_data[71][0:8].decode(errors='ignore').\
             replace('\x00', '')
-        game_data['team1_name'] = unpacked_data[71][9:18].decode().\
+        game_data['team1_name'] = unpacked_data[71][9:18].decode(errors='ignore').\
             replace('\x00', '')
         game_data['segments_checksum'] = unpacked_data[144]
         game_data['team0_kills'] = unpacked_data[145]
@@ -237,7 +237,7 @@ def dxx_process_game_info_response(data):
         for num in range(4, 36, 4):
             plr_num = 'player{0}'.format(player_step)
             game_data[plr_num + 'name'] = \
-                (unpacked_data[num].decode().split('\x00', 1))[0]
+                (unpacked_data[num].decode(errors='ignore').split('\x00', 1))[0]
             game_data[plr_num + 'connected'] = unpacked_data[num + 1]
             game_data[plr_num + 'deaths'] = unpacked_data[deaths_step]
             game_data[plr_num + 'kills'] = unpacked_data[kills_step]
@@ -304,15 +304,15 @@ def dxx_process_game_list_response(data):
 
     game_data = {}
     game_data['ipv6'] = unpacked_data[1]
-    game_data['ip'] = unpacked_data[2].decode().replace('\x00', '')
+    game_data['ip'] = unpacked_data[2].decode(errors='ignore').replace('\x00', '')
     game_data['port'] = unpacked_data[3]
     game_data['release_major'] = unpacked_data[4]
     game_data['release_minor'] = unpacked_data[5]
     game_data['release_micro'] = unpacked_data[6]
     game_data['game_id'] = unpacked_data[7]
-    game_data['netgame_name'] = unpacked_data[8].decode().replace('\x00', '')
-    game_data['mission_title'] = unpacked_data[9].decode().replace('\x00', '')
-    game_data['mission_name'] = unpacked_data[10].decode().replace('\x00', '')
+    game_data['netgame_name'] = unpacked_data[8].decode(errors='ignore').replace('\x00', '')
+    game_data['mission_title'] = unpacked_data[9].decode(errors='ignore').replace('\x00', '')
+    game_data['mission_name'] = unpacked_data[10].decode(errors='ignore').replace('\x00', '')
     game_data['level_num'] = unpacked_data[11]
     game_data['mode'] = unpacked_data[12]
     game_data['refuse_players'] = unpacked_data[13]
