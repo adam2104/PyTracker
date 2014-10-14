@@ -156,6 +156,18 @@ def game_info_request(req_type, key):
 
     address = (active_games[key]['ip'], active_games[key]['port'])
 
+    # LAN broadcasts do not include the game version (i.e. D1 vs D2), so the
+    # version is defaulted to D1. When D2 games receive game_info requests for
+    # D1, the game does not respond. So, if there's 3 pending info requests,
+    # let's try setting the version to D2 to see if it responds to that. Only
+    # do this for games that are not confirmed. If the game is confirmed, we
+    # already know what the version is.
+    if (active_games[key]['confirmed'] == 0 and
+            active_games[key]['pending_info_reqs'] >= 3):
+        logger.debug('Unconfirmed game with several pending requests, trying '
+                     'request as D2 instead')
+        active_games[key]['version'] = 2
+
     dxx_send_game_info_request(active_games[key]['version'], req_type,
                                active_games[key]['netgame_proto'],
                                address, active_games[key]['socket'])
@@ -387,6 +399,50 @@ def game_list_response(data, version):
                                               active_games[key]))
 
 
+def lan_game_broadcast(data, address):
+    logger.debug('entered lan_game_broadcast')
+
+    game_data = dxx_process_game_info_response(data)
+    if not game_data:
+        logger.debug('Unable to handle game_info response')
+        return False
+
+    key = '{0}:{1}'.format(address[0], address[1])
+
+    # Perform a duplicate game check to make sure we don't already have a game
+    # registered via this ip:port, but with a different game_id.
+    if active_game_check(key):
+        if active_games[key]['game_id'] != game_data['game_id']:
+            logger.debug('Game ID {0} hosted by {1} is stale.'.format(
+                active_games[key]['game_id'], key))
+            stale_game(key)
+        else:
+            logger.debug('Game ID {0} hosted by {1} is already '
+                         'registered.'.format(active_games[key]['game_id'],
+                                              key))
+            return True
+
+    # If we've made it here this is a new game so add it to the
+    # active_games dict.
+    active_games[key] = {}
+    active_games[key].update(NEW_GAME_TEMPLATE)
+    active_games[key].update(game_data)
+    active_games[key]['ip'] = address[0]
+    active_games[key]['port'] = address[1]
+    active_games[key]['socket'] = allocate_socket()
+    active_games[key]['register_ip'] = address[0]
+    active_games[key]['register_port'] = address[1]
+    active_games[key]['version'] = '1'
+
+    # send a game_info request
+    game_info_request(1, key)
+
+    logger.debug('Added new LAN game ID {0} hosted by {1} to '
+                 'active_games: \n{2}'.format(active_games[key]['game_id'],
+                                              key,
+                                              active_games[key]))
+
+
 def web_interface_ping(data, address):
     logger.debug('entered web_interface_ping')
 
@@ -553,6 +609,12 @@ listen_socket.bind((listen_ip_address, listen_port))
 d1x_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 d2x_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
+# open LAN spy socket to scrapping games off the local LAN
+# should this be configurable? Not sure it matters.
+lan_port = 42424
+lan_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+lan_socket.bind((listen_ip_address, lan_port))
+
 # create directories for output
 for s in ['tracker', 'tracker/archive_data']:
     my_mkdir(s)
@@ -577,7 +639,7 @@ if old_game_data:
         active_games[i]['socket'] = allocate_socket()
 
 while True:
-    socket_list = [listen_socket, d1x_socket, d2x_socket]
+    socket_list = [listen_socket, d1x_socket, d2x_socket, lan_socket]
 
     # Add any new game sockets to the socket_list so that we can handle
     # incoming packets from those games
@@ -615,7 +677,11 @@ while True:
                 elif (data[0] == OPCODE_GAME_INFO_RESPONSE or
                         data[0] == OPCODE_GAME_INFO_LITE_RESPONSE):
                     logger.debug('OPcode: info_response')
-                    game_info_response(data, address)
+
+                    if i == lan_socket:
+                        lan_game_broadcast(data, address)
+                    else:
+                        game_info_response(data, address)
                 elif data[0] == OPCODE_GAME_LIST_RESPONSE:
                     # Make sure this game from the tracker and no some bad
                     # dude trying to do something malicious
