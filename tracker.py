@@ -188,18 +188,20 @@ def game_info_response(data, address):
     else:
         active_games[key]['pending_info_reqs'] = 0
 
-    # If we make it here, we should update the active_games dict with the
-    # information we got back from this game_info_response
-    active_games[key].update(game_data)
-
-    # If we don't have a start time recorded for this game, and, if the game
-    # has actually started playing, go ahead and record the (approx) start time
-    if (active_games[key]['start_time'] == 0 and
-            active_games[key]['status'] == 1):
-        active_games[key]['start_time'] = time.time()
+    # if this is a game_info_list_response, make sure the game ID in the
+    # response matches the game ID we have stored for this game. If not, mark
+    # the game stale and return
+    if data[0] == OPCODE_GAME_INFO_LITE_RESPONSE:
+        if game_data['game_id'] != active_games[key]['game_id']:
+            logger.error('Received game_info_lite_response with a different '
+                         'gameID than know gameID, marking existing game stale')
+            stale_game(key)
+            return False
+        else:
+            active_games[key].update(game_data)
 
     # Check whether or not this game has already been confirmed by an info_lite
-    # response. If not, make it as confirmed and then return, even if this is
+    # response. If not, mark it as confirmed and then return, even if this is
     # a detailed response with data we could use. This will prevent game state
     # mismatches when Rebirth games are hosted, quit, and rehosted when info
     # requests are in-flight over the network. We'll get detailed info from
@@ -225,6 +227,26 @@ def game_info_response(data, address):
 
     # If the opcode for this game was 3, this is a full game info response
     if data[0] == OPCODE_GAME_INFO_RESPONSE:
+
+        # full game_info_responses do not include the gameID field, so we need
+        # to validate that this is the same game as the one we have stored. We
+        # do this by comparing a few fields that cannot change once the game
+        # has already started.
+
+        if active_games[key]['detailed'] == 1:
+            if (game_data['netgame_name'] != active_games[key]['netgame_name'] or
+                    game_data['player0name'] != active_games[key]['player0name'] or
+                    game_data['player0deaths'] < active_games[key]['player0deaths'] or
+                    game_data['mission_name'] != active_games[key]['mission_name']):
+                logger.error('Received game_info_response that appears to be for a '
+                         'game different than the one already know for this '
+                         'host, marking existing game stale.')
+                stale_game(key)
+                return False
+
+        # if we've made it here, this game must be the same one as the one we're
+        # tracking, so go ahead and update the active_games entry for it.
+        active_games[key].update(game_data)
 
         # determine if we're talking to Rebirth or Retro
         if 'variant' not in active_games[key]:
@@ -254,6 +276,12 @@ def game_info_response(data, address):
 
         # note that we've got detailed data
         active_games[key]['detailed'] = 1
+
+    # If we don't have a start time recorded for this game, and, if the game
+    # has actually started playing, go ahead and record the (approx) start time
+    if (active_games[key]['start_time'] == 0 and
+            active_games[key]['status'] == 1):
+        active_games[key]['start_time'] = time.time()
 
     logger.debug('Updated game ID {0} hosted by {1} in '
                  'active_games: \n{2}'.format(active_games[key]['game_id'],
@@ -357,9 +385,9 @@ def game_list_response(data, version):
                      'game version, dropping')
         return False
 
-    # make sure there's an actual port number here
-    if game_data['port'] < 1024:
-        logger.error('Port value under 1024, dropping')
+    # make sure there's a valid IP or an actual port number here
+    if (game_data['ip'] == '0.0.0.0' or game_data['port'] < 1024):
+        logger.error('Invalid IP or port value under 1024, dropping')
         return False
 
     key = '{0}:{1}'.format(game_data['ip'], game_data['port'])
@@ -414,9 +442,10 @@ def stale_game(key):
     if not active_game_check(key):
         return False
 
-    # Because this is a stale game we're about to archive, or delete, go ahead
-    # and detach the socket and then delete the socket from the game list
-    active_games[key]['socket'].detach()
+    # Because this is a stale game we're about to archive, or delete, mark
+    # the socket stale and then remove it from the active_game entry to avoid
+    # causing a json encode/decode error when the active game list is written
+    # to a file
     stale_sockets.append(active_games[key]['socket'])
     del active_games[key]['socket']
 
@@ -701,9 +730,8 @@ while True:
                              'closing and reopening game '
                              'socket'.format(active_games[i]['game_id'], i))
 
-                # don't actually close the socket, detach it, mark it stale to
+                # don't actually close the socket, mark it stale to
                 # avoid causing a fderror in the select loop
-                active_games[i]['socket'].detach()
                 stale_sockets.append(active_games[i]['socket'])
                 active_games[i]['socket'] = allocate_socket()
 
