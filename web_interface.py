@@ -2,6 +2,7 @@ __author__ = 'Adam Gensler'
 
 from dxxtoolkit import dxx_sendto, dxx_unpack
 from my_functions import *
+from datetime import date
 import logging
 import logging.handlers
 import os
@@ -801,9 +802,14 @@ while True:
         archive_index = '<html><head><title>DXX Tracker Archive</title>' \
                         '</head><body>'
 
-        for i in archived_games:
-            if re.match(r'^game-', i):
-                archive_index += '<a href="./{0}">{0}</a><br>'.format(i)
+        # game archives that span years, 2014, 2015, etc, will be sorted
+        # strangely, so, look for games, starting with 2014, until the
+        # current year
+        for year in reversed(range(2014, date.today().year + 1)):
+            for i in archived_games:
+                regex_string = r'game-[0-9]{2}-[0-9]{2}-' + str(year) + '-'
+                if re.match(regex_string, i):
+                    archive_index += '<a href="./{0}">{0}</a><br>'.format(i)
 
         archive_index += '</body></html>'
 
