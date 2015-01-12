@@ -302,19 +302,26 @@ def version_deny(address):
         logger.debug('Unable to handle version deny, no data')
         return False
 
-    # check the game version, make sure we can support it
+    # check the main game version, make sure we can support it
     if not check_version(game_data['release_major'],
                          game_data['release_minor'],
                          game_data['release_micro']):
         logger.error('Unknown game version, dropping')
         return False
 
-    active_games[key]['netgame_proto'] = game_data['netgame_proto']
-
-    logger.debug('Netgame protocol for game ID {0} host by {1} '
-                 'set to {2}'.format(active_games[key]['game_id'],
-                                       key,
-                                       active_games[key]['netgame_proto']))
+    # check the net game protocol version to make sure we know how to decode
+    # the output. If not, set the version to unknown so we use just game info
+    # lite requests.
+    if game_data['netgame_proto'] in SUPPORTED_NETGAME_PROTO_VERSIONS:
+        active_games[key]['netgame_proto'] = game_data['netgame_proto']
+        logger.debug('Netgame protocol for game ID {0} host by {1} '
+             'set to {2}'.format(active_games[key]['game_id'],
+                                   key,
+                                   active_games[key]['netgame_proto']))
+    else:
+        active_games[key]['netgame_proto'] = 'unknown'
+        logger.debug('Unknown Netgame protocol for game ID {0} host by {1}'.
+                     format(active_games[key]['game_id'], key))
 
 
 def game_list_request(data, address):
@@ -560,10 +567,12 @@ MISSION_NAME_LENGTH = 25
 MAJOR_VERSION = 0
 MINOR_VERSION = 58
 MICRO_VERSION = 1
+SUPPORTED_NETGAME_PROTO_VERSIONS = (0, 2130, 2131)
 TRACKER_PROTOCOL_VERSION = 0
 GAME_VARIANTS = get_variants()
 NEW_GAME_TEMPLATE = {'confirmed': 0, 'pending_info_reqs': 0, 'start_time': 0,
-                     'detailed': 0, 'netgame_proto': 0, 'main_tracker': 0}
+                     'detailed': 0, 'netgame_proto': 0,
+                     'main_tracker': 0}
 LEGACY_GAME_TEMPLATE = {'retro_proto': 0, 'alt_colors': 0, 'primary_dupe': 0,
                         'secondary_dupe': 0, 'secondary_cap': 0,
                         'born_burner': 0}
@@ -715,9 +724,11 @@ while True:
             logger.debug('Polling game ID {0} hosted by '
                          '{1} for stats'.format(active_games[i]['game_id'], i))
 
-            # send info_lite_req to unconfirmed games,
+            # send info_lite_req to unconfirmed games or games with unknown
+            # net protocol versions.
             # send full info_req to confirmed games
-            if active_games[i]['confirmed'] == 0:
+            if (active_games[i]['confirmed'] == 0 or
+                active_games[i]['netgame_proto'] == 'unknown'):
                 game_info_request(0, i)
             else:
                 game_info_request(1, i)
