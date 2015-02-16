@@ -105,19 +105,12 @@ def dxx_process_unregister(data):
     return game_data
 
 
-def dxx_process_game_info_response(data):
+def dxx_process_game_info_response(data, version):
     logger.debug('entered dxx_process_game_info_response')
 
     if len(data) == 73:
         # game_info_lite response
         unpack_string = '=BHHHI16s26s9sIBBBBBBB'
-    elif len(data) == 510:
-        # dxx rebirth 0.58.1 game_info
-        unpack_string = ('=BHHH9sBBB9sBBB9sBBB9sBBB9sBBB9sBBB9sBBB9sBBB9s'
-                         'BBB9sBBB9sBBB9sBBB16s26s9sIBBBBBBBBBIHHHHH18sII'
-                         'IIIIIIhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh'
-                         'hhhhhhhhhhhhhhhhhhhhhhhHhhhhhhhhhhhhhhhhhhIIIII'
-                         'IIIIIIIIBBBBBBBBHBBB')
     elif len(data) == 519:
         # d1x retro 1.3 game_info
         unpack_string = ('=BHHH9sBBB9sBBB9sBBB9sBBB9sBBB9sBBB9sBBB9sBBB9s'
@@ -125,6 +118,8 @@ def dxx_process_game_info_response(data):
                          'IIIIIIhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh'
                          'hhhhhhhhhhhhhhhhhhhhhhhHhhhhhhhhhhhhhhhhhhIIIII'
                          'IIIIIIIIBBBBBBBBHBBBBBBBBBBBB')
+        # player data and settings are mingled together, might change over time
+        settings_offset = 52
     elif len(data) == 520:
         # d2x retro 1.3 game_info
         unpack_string = ('=BHHH9sBBB9sBBB9sBBB9sBBB9sBBB9sBBB9sBBB9sBBB9s'
@@ -132,6 +127,17 @@ def dxx_process_game_info_response(data):
                          'IIIIIIhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh'
                          'hhhhhhhhhhhhhhhhhhhhhhhHhhhhhhhhhhhhhhhhhhIIIII'
                          'IIIIIIIIBBBBBBBBHBBBBBBBBBBBBB')
+        # player data and settings are mingled together, might change over time
+        settings_offset = 52
+    elif len(data) == 546 and version == 1:
+        # d1 retro 1.4X3
+        unpack_string = ('=BHHH9sBBBBB9sBBBBB9sBBBBB9sBBBBB9sBBBBB9sBBBBB9sBBBBB9sBBBBB9s'
+                         'BBBBB9sBBBBB9sBBBBB9sBBBBB16s26s9sIBBBBBBBBBIHHHHH18sII'
+                         'IIIIIIhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh'
+                         'hhhhhhhhhhhhhhhhhhhhhhhHhhhhhhhhhhhhhhhhhhIIIII'
+                         'IIIIIIIIBBBBBBBBHBBBBBBBBBBBBBBB')
+        # player data and settings are mingled together, might change over time
+        settings_offset = 76
     else:
         logger.error('Received game info response with incorrect length')
         return False
@@ -166,93 +172,131 @@ def dxx_process_game_info_response(data):
         game_data['max_players'] = unpacked_data[14]
         game_data['flags'] = unpacked_data[15]
     else:
-        # Full game_info response from DXX Rebirth and Retro
-        game_data['netgame_name'] = unpacked_data[52].decode(errors='ignore').\
+        # Full game_info response
+        game_data['netgame_name'] = unpacked_data[settings_offset].decode(errors='ignore').\
             replace('\x00', '')
-        game_data['mission_title'] = unpacked_data[53].decode(errors='ignore').\
+        game_data['mission_title'] = unpacked_data[settings_offset+1].decode(errors='ignore').\
             replace('\x00', '')
-        game_data['mission_name'] = unpacked_data[54].decode(errors='ignore').\
+        game_data['mission_name'] = unpacked_data[settings_offset+2].decode(errors='ignore').\
             replace('\x00', '')
-        game_data['level_num'] = unpacked_data[55]
-        game_data['mode'] = unpacked_data[56]
-        game_data['refuse_players'] = unpacked_data[57]
-        game_data['difficulty'] = unpacked_data[58]
-        game_data['status'] = unpacked_data[59]
+        game_data['level_num'] = unpacked_data[settings_offset+3]
+        game_data['mode'] = unpacked_data[settings_offset+4]
+        game_data['refuse_players'] = unpacked_data[settings_offset+5]
+        game_data['difficulty'] = unpacked_data[settings_offset+6]
+        game_data['status'] = unpacked_data[settings_offset+7]
 
         # num of players ever to connect to this game
-        game_data['num_players'] = unpacked_data[60]
+        game_data['num_players'] = unpacked_data[settings_offset+8]
 
-        game_data['max_players'] = unpacked_data[61]
+        game_data['max_players'] = unpacked_data[settings_offset+9]
 
         # num of currently connected players
-        game_data['players'] = unpacked_data[62]
+        game_data['players'] = unpacked_data[settings_offset+10]
 
-        game_data['flags'] = unpacked_data[63]
-        game_data['team_vector'] = unpacked_data[64]
-        game_data['allowed_items'] = unpacked_data[65]
-        game_data['allow_marker_view'] = unpacked_data[66] # not used in D1
-        game_data['always_lighting'] = unpacked_data[67] # not used in D1
-        game_data['show_enemy_names'] = unpacked_data[68]
-        game_data['bright_ships'] = unpacked_data[69]
-        game_data['spawn_style'] = unpacked_data[70]
-        game_data['team0_name'] = unpacked_data[71][0:8].decode(errors='ignore').\
+        game_data['flags'] = unpacked_data[settings_offset+11]
+        game_data['team_vector'] = unpacked_data[settings_offset+12]
+        game_data['allowed_items'] = unpacked_data[settings_offset+13]
+        game_data['allow_marker_view'] = unpacked_data[settings_offset+14] # not used in D1
+        game_data['always_lighting'] = unpacked_data[settings_offset+15] # not used in D1
+        game_data['show_enemy_names'] = unpacked_data[settings_offset+16]
+        game_data['bright_ships'] = unpacked_data[settings_offset+17]
+        game_data['spawn_style'] = unpacked_data[settings_offset+18]
+        game_data['team0_name'] = unpacked_data[settings_offset+19][0:8].decode(errors='ignore').\
             replace('\x00', '')
-        game_data['team1_name'] = unpacked_data[71][9:18].decode(errors='ignore').\
+        game_data['team1_name'] = unpacked_data[settings_offset+19][9:18].decode(errors='ignore').\
             replace('\x00', '')
-        game_data['segments_checksum'] = unpacked_data[144]
-        game_data['team0_kills'] = unpacked_data[145]
-        game_data['team1_kills'] = unpacked_data[146]
-        game_data['kill_goal'] = unpacked_data[163] * 10
-        game_data['max_time'] = unpacked_data[164] * 5 * 60
-        game_data['level_time'] = unpacked_data[165]
-        game_data['reactor_life'] = int(unpacked_data[166] / 65535)
-        game_data['monitor_vector'] = unpacked_data[167]
-        game_data['packets_sec'] = unpacked_data[184]
-        game_data['short_packets'] = unpacked_data[185]
-        game_data['packet_loss_prevention'] = unpacked_data[186]
-        game_data['no_friendly_fire'] = unpacked_data[187]
+        game_data['segments_checksum'] = unpacked_data[settings_offset+92]
+        game_data['team0_kills'] = unpacked_data[settings_offset+93]
+        game_data['team1_kills'] = unpacked_data[settings_offset+94]
+        game_data['kill_goal'] = unpacked_data[settings_offset+111] * 10
+        game_data['max_time'] = unpacked_data[settings_offset+112] * 5 * 60
+        game_data['level_time'] = unpacked_data[settings_offset+113]
+        game_data['reactor_life'] = int(unpacked_data[settings_offset+114] / 65535)
+        game_data['monitor_vector'] = unpacked_data[settings_offset+115]
+        game_data['packets_sec'] = unpacked_data[settings_offset+132]
+        game_data['short_packets'] = unpacked_data[settings_offset+133]
+        game_data['packet_loss_prevention'] = unpacked_data[settings_offset+134]
+        game_data['no_friendly_fire'] = unpacked_data[settings_offset+135]
+        game_data['retro_proto'] = unpacked_data[settings_offset+136]
+        game_data['respawn_concs'] = unpacked_data[settings_offset+137]
+        game_data['allow_colored_lights'] = unpacked_data[settings_offset+138]
+        game_data['fair_colors'] = unpacked_data[settings_offset+139]
+        game_data['alt_colors'] = unpacked_data[settings_offset+140]
+        game_data['spawn_style'] = unpacked_data[settings_offset+141]
+        game_data['primary_dupe'] = unpacked_data[settings_offset+142]
+        game_data['secondary_dupe'] = unpacked_data[settings_offset+143]
+        game_data['secondary_cap'] = unpacked_data[settings_offset+144]
 
-        # retro options, decode as necessary
-        if len(data) == 519 or len(data) == 520:
-            game_data['retro_proto'] = unpacked_data[188]
-            game_data['respawn_concs'] = unpacked_data[189]
-            game_data['allow_colored_lights'] = unpacked_data[190]
-            game_data['fair_colors'] = unpacked_data[191]
-            game_data['alt_colors'] = unpacked_data[192]
-            game_data['spawn_style'] = unpacked_data[193]
-            game_data['primary_dupe'] = unpacked_data[194]
-            game_data['secondary_dupe'] = unpacked_data[195]
-            game_data['secondary_cap'] = unpacked_data[196]
-
-        # if this is D2 retro, we need to handle 1 extra byte of data
+        # if this is D2 retro 1.3, we need to handle 1 extra byte of data
         if len(data) == 520:
-            game_data['born_burner'] = unpacked_data[197]
+            game_data['born_burner'] = unpacked_data[settings_offset+145]
 
-        # get the player data out
+        # if this is d1 retro 1.4X3
+        if len(data) == 546 and version == 1:
+            game_data['dark_smarts'] = unpacked_data[settings_offset+145]
+            game_data['low_vulcan'] = unpacked_data[settings_offset+146]
+            game_data['allow_colors'] = unpacked_data[settings_offset+147]
+
+        # if this is d2 retro 1.4X3
+        if len(data) == 546 and version == 2:
+            game_data['dark_smarts'] = unpacked_data[settings_offset+146]
+            game_data['low_vulcan'] = unpacked_data[settings_offset+147]
+            game_data['allow_colors'] = unpacked_data[settings_offset+148]
+
+        # player data offsets
         player_step = 0
-        suicides_step = 80
-        deaths_step = 147
-        kills_step = 155
-        kill_table_step = 80
-        for num in range(4, 36, 4):
-            plr_num = 'player{0}'.format(player_step)
-            game_data[plr_num + 'name'] = \
-                (unpacked_data[num].decode(errors='ignore').split('\x00', 1))[0]
-            game_data[plr_num + 'connected'] = unpacked_data[num + 1]
-            game_data[plr_num + 'deaths'] = unpacked_data[deaths_step]
-            game_data[plr_num + 'kills'] = unpacked_data[kills_step]
-            game_data[plr_num + 'suicides'] = unpacked_data[suicides_step]
+        suicides_step = settings_offset + 28
+        deaths_step = settings_offset + 95
+        kills_step = settings_offset + 103
+        kill_table_step = settings_offset + 28
 
-            # pull out the kill table data, 8x8 matrix, player0 - 7
-            game_data[plr_num + 'kill_table'] = []
-            for i in range(kill_table_step, kill_table_step + 8):
-                game_data[plr_num + 'kill_table'].append(unpacked_data[i])
-            kill_table_step += 8
+        # d1/d2 retro 1.3, player data
+        if len(data) == 519 or len(data) == 520:
+            for num in range(4, 36, 4):
+                plr_num = 'player{0}'.format(player_step)
+                game_data[plr_num + 'name'] = \
+                    (unpacked_data[num].decode(errors='ignore').split('\x00', 1))[0]
+                game_data[plr_num + 'connected'] = unpacked_data[num + 1]
+                game_data[plr_num + 'rank'] = unpacked_data[num + 2]
+                game_data[plr_num + 'deaths'] = unpacked_data[deaths_step]
+                game_data[plr_num + 'kills'] = unpacked_data[kills_step]
+                game_data[plr_num + 'suicides'] = unpacked_data[suicides_step]
 
-            player_step += 1
-            deaths_step += 1
-            kills_step += 1
-            suicides_step += 9
+                # pull out the kill table data, 8x8 matrix, player0 - 7
+                game_data[plr_num + 'kill_table'] = []
+                for i in range(kill_table_step, kill_table_step + 8):
+                    game_data[plr_num + 'kill_table'].append(unpacked_data[i])
+                kill_table_step += 8
+
+                player_step += 1
+                deaths_step += 1
+                kills_step += 1
+                suicides_step += 9
+
+        # d1/d2 retro 1.4X3, player data
+        elif len(data) == 546:
+            for num in range(4, 52, 6):
+                plr_num = 'player{0}'.format(player_step)
+                game_data[plr_num + 'name'] = \
+                    (unpacked_data[num].decode(errors='ignore').split('\x00', 1))[0]
+                game_data[plr_num + 'connected'] = unpacked_data[num + 1]
+                game_data[plr_num + 'rank'] = unpacked_data[num + 2]
+                game_data[plr_num + 'color'] = unpacked_data[num + 3]
+                game_data[plr_num + 'missle_color'] = unpacked_data[num + 4]
+                game_data[plr_num + 'deaths'] = unpacked_data[deaths_step]
+                game_data[plr_num + 'kills'] = unpacked_data[kills_step]
+                game_data[plr_num + 'suicides'] = unpacked_data[suicides_step]
+
+                # pull out the kill table data, 8x8 matrix, player0 - 7
+                game_data[plr_num + 'kill_table'] = []
+                for i in range(kill_table_step, kill_table_step + 8):
+                    game_data[plr_num + 'kill_table'].append(unpacked_data[i])
+                kill_table_step += 8
+
+                player_step += 1
+                deaths_step += 1
+                kills_step += 1
+                suicides_step += 9
 
     return game_data
 

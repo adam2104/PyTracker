@@ -110,33 +110,23 @@ def build_html_basic_stats(data):
     html_output = '<table style=width:100% align=center cellspacing=0 ' \
                   'border=1>'
 
-    # game header
-    if 'variant' in data:
-        variant = 'DXX {0}'.format(data['variant'].upper())
+    # determine which version this is
+    if data['netgame_proto'] == 2130 or data['netgame_proto'] == 2131:
+        variant = 'RETRO 1.3'
+    elif data['netgame_proto'] == 2943:
+        variant = 'RETRO 1.4X3'
     else:
-        variant = 'DXX UNKNOWN'
-
-    if data['main_tracker'] == 1:
-        tracker = '<a href=\'http://dxxtracker.reenigne.net\'>' \
-                  'Main Tracker' \
-                  '</a>'
-    else:
-        tracker = '<a href=\'http://retro-tracker.game-server.cc\'>' \
-                  'Alternate Tracker' \
-                  '</a>'
+        variant = 'UNKNOWN'
 
     if data['start_time'] > 0:
         html_output += '<tr><td colspan=5 bgcolor=#D0D0D0 ><b>{0} - </b>' \
-                       'Start time: {1} GMT - ' \
-                       'Hosted on {2}' \
+                       'Start time: {1} GMT -    ' \
                        '</td></tr>'.format(variant,
-                                           my_time(data['start_time']),
-                                           tracker)
+                                           my_time(data['start_time']))
     else:
         html_output += '<tr>' \
                        '<td colspan=5 bgcolor=#D0D0D0>' \
-                       '<b>{0} - </b>Hosted on {1}</td></tr>'.format(variant,
-                                                                  tracker)
+                       '<b>{0}</b> - Not Started</td></tr>'.format(variant)
 
     # start row
     html_output += '<tr>'
@@ -352,6 +342,12 @@ def build_html_detailed_stats(data, mode):
     else:
         html_output += '<br><b>Bright Ships: </b> N'
 
+    # retro proto
+    if data['retro_proto'] > 0:
+        html_output += '<br><b>P2P (Retro) Proto: </b> Y'
+    else:
+        html_output += '<br><b>P2P (Retro) Proto: </b> N'
+
     # end column
     html_output += '</td>'
 
@@ -360,52 +356,55 @@ def build_html_detailed_stats(data, mode):
 
     # fifth column
 
-    # display retro 1.3+ specific stuff only if its a retro game
-    if data['variant'] == GAME_VARIANTS[2]:
-
-        # retro proto
-        if data['retro_proto'] > 0:
-            html_output += '<b>P2P (Retro) Proto: </b> Y'
+    # if D2, highlight burner option
+    if data['version'] == 2:
+        if data['born_burner'] == 1:
+            html_output += '<br><b>Spawn with burner: </b> Y'
         else:
-            html_output += '<b>P2P (Retro) Proto: </b> N'
+            html_output += '<br><b>Spawn with burner: </b> N'
 
-        # if D2, highlight burner option
-        if data['version'] == 2:
-            if data['born_burner'] == 1:
-                html_output += '<br><b>Spawn with burner: </b> Y'
-            else:
-                html_output += '<br><b>Spawn with burner: </b> N'
-
-        # primaries dupe factor
-        var = ''
-        if data['primary_dupe'] > 0:
-            var = '{0}x'.format(str(data['primary_dupe']))
-        else:
-            var = 'n/a'
-        html_output += '<br><b>Primary Dupe: </b>{0}'.format(var)
-
-        # secondaries dupe factor
-        var = ''
-        if data['secondary_dupe'] > 0:
-            var = '{0}x'.format(str(data['secondary_dupe']))
-        else:
-            var = 'n/a'
-        html_output += '<br><b>Secondary Dupe: </b>{0}'.format(var)
-
-        # secondaries cap factor
-        var = ''
-        if data['secondary_cap'] == 0:
-            var = 'Uncapped'
-        elif data['secondary_cap'] == 1:
-            var = 'Max 6'
-        elif data['secondary_cap'] == 2:
-            var = 'Max 2'
-        else:
-            var = 'Unknown'
-        html_output += '<br><b>Secondary Cap: </b>{0}'.format(var)
+    # primaries dupe factor
+    var = ''
+    if data['primary_dupe'] > 0:
+        var = '{0}x'.format(str(data['primary_dupe']))
     else:
-        html_output += 'Not a DXX Retro game.<br>Detailed info is not ' \
-                       'available.'
+        var = 'n/a'
+    html_output += '<b>Primary Dupe: </b>{0}'.format(var)
+
+    # secondaries dupe factor
+    var = ''
+    if data['secondary_dupe'] > 0:
+        var = '{0}x'.format(str(data['secondary_dupe']))
+    else:
+        var = 'n/a'
+    html_output += '<br><b>Secondary Dupe: </b>{0}'.format(var)
+
+    # secondaries cap factor
+    var = ''
+    if data['secondary_cap'] == 0:
+        var = 'Uncapped'
+    elif data['secondary_cap'] == 1:
+        var = 'Max 6'
+    elif data['secondary_cap'] == 2:
+        var = 'Max 2'
+    else:
+        var = 'Unknown'
+    html_output += '<br><b>Secondary Cap: </b>{0}'.format(var)
+
+    # if retro 1.4, display this data
+    if data['netgame_proto'] == 2943:
+
+        # low vulcan ammo proto
+        if data['retro_proto'] > 1:
+            html_output += '<br><b>Low Vulcan Ammo: </b> Y'
+        else:
+            html_output += '<br><b>Low Vulcan Ammo: </b> N'
+
+        # custom colors
+        if data['allow_colors'] > 1:
+            html_output += '<br><b>Custom Colors: </b> Y'
+        else:
+            html_output += '<br><b>Custom Colors: </b> N'
 
     # end column
     html_output += '</td>'
@@ -634,10 +633,7 @@ def build_html_detailed_stats(data, mode):
 def build_html_footer(mode):
     html_output = '</td></tr>' \
                   '<tr><td><hr></td></tr>' \
-                  '<tr><td><font size=2>Data above from the main and ' \
-                  'alternate trackers. For the main tracker, go ' \
-                  '<a href=\'http://dxxtracker.reenigne.net/\'>here</a>.' \
-                  '<br>To use the alternate tracker, configure \'<b>' \
+                  '<tr><td><font size=2>To use this tracker, configure \'<b>' \
                   '<i>-tracker_hostaddr retro-tracker.game-server.cc</b>' \
                   '</i>\' in d1x.ini or d2x.ini, or add it to your D1X or ' \
                   'D2X shortcut.<br>Games monitored by this tracker are ' \
@@ -651,43 +647,20 @@ def build_html_footer(mode):
     if mode == 'tracker':
         if ping_tracker(('127.0.0.1', 42420)):
             html_output += '<tr>' \
-                           '<td bgcolor=#00FF00>Alternate Tracker is UP' \
+                           '<td bgcolor=#00FF00>Tracker backend is UP' \
                            '</td>' \
                            '</tr>'
-
-            # try to guess whether or not the main tracker is up
-            if last_list_response_time == 0:
-                html_output += '<tr>' \
-                               '<td bgcolor=#FFFF00>Last message from Main' \
-                               ' Tracker: unknown' \
-                               '</td>' \
-                               '</tr>'
-            elif int((time.time() - last_list_response_time) / 3600) < 12:
-                html_output += '<tr>' \
-                               '<td bgcolor=#00FF00>Last message from Main' \
-                               ' Tracker: {0} GMT' \
-                               '</td>' \
-                               '</tr>'.format(my_time(last_list_response_time))
-            elif int((time.time() - last_list_response_time) / 3600) > 12 and \
-                    int((time.time() - last_list_response_time) / 3600) < 25:
-                html_output += '<tr><td bgcolor=#FFFF00>Last message from Main' \
-                               ' Tracker: {0} GMT</td></tr>'.format(
-                    my_time(last_list_response_time))
-            else:
-                html_output += '<tr><td bgcolor=#FF0000>Last message from Main' \
-                               ' Tracker: {0} GMT</td></tr>'.format(
-                    my_time(last_list_response_time))
         else:
-            logger.error('Alternate tracker is down!')
+            logger.error('Tracker backend is down!')
             if last_alt_tracker_ping == 0:
                 html_output += '<tr>' \
-                               '<td bgcolor=#FF0000>Alternate Tracker is ' \
+                               '<td bgcolor=#FF0000>Tracker backend is ' \
                                'DOWN.' \
                                '</td>' \
                                '</tr>'
             else:
                 html_output += '<tr>' \
-                               '<td bgcolor=#FF0000>Alternate Tracker is ' \
+                               '<td bgcolor=#FF0000>Tracker backend is ' \
                                'DOWN.' \
                                ' Last successful ping: {0} GMT' \
                                '</td></tr>'.format(my_time(last_alt_tracker_ping))
@@ -730,7 +703,6 @@ ITEM_LIST = ('Laser Upgrade', 'Quad Lasers', 'Vulcan Cannon', 'Vulcan Ammo',
              'Flash Missiles', 'Guided Missiles', 'Smart Mines',
              'Mercury Missiles', 'Earthshaker Missiles', 'Afterburners',
              'Ammo Rack', 'Energy Converter', 'Headlight')
-GAME_VARIANTS = get_variants()
 
 for i in ['tracker', 'tracker/archive', 'tracker/archive_data',
           'tracker/archive_data/old']:

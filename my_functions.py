@@ -58,10 +58,6 @@ def my_load_file(filename):
     return data
 
 
-def get_variants():
-    return ('unknown', 'rebirth 0.58.1', 'retro 1.3')
-
-
 def my_gethostbyname(hostname):
     logger.debug('entered my_gethostbyname')
     try:

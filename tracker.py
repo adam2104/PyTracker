@@ -33,20 +33,6 @@ def active_game_check(key):
         return False
 
 
-def determine_variant(versions):
-    logger.debug('entered determine_variant')
-
-    if (versions == (0, 58, 1, 0)):
-        # dxx rebirth 0.58.1
-        return GAME_VARIANTS[1]
-
-    if (versions == (0, 58, 1, 2130) or versions == (0, 58, 1, 2131)):
-        # dxx retro 1.3
-        return GAME_VARIANTS[2]
-
-    return GAME_VARIANTS[0]
-
-
 def allocate_socket(address = '', port = 0):
     logger.debug('entered allocate_socket')
 
@@ -175,11 +161,6 @@ def game_info_response(data, address):
     if not active_game_check(key):
         return False
 
-    game_data = dxx_process_game_info_response(data)
-    if not game_data:
-        logger.debug('Unable to handle game_info response')
-        return False
-
     # Make sure we actually have a request pending before processing the data
     if active_games[key]['pending_info_reqs'] == 0:
         logger.error('Received info response from {0} when no info '
@@ -188,7 +169,12 @@ def game_info_response(data, address):
     else:
         active_games[key]['pending_info_reqs'] = 0
 
-    # if this is a game_info_list_response, make sure the game ID in the
+    game_data = dxx_process_game_info_response(data, active_games[key]['version'])
+    if not game_data:
+        logger.debug('Unable to handle game_info response')
+        return False
+
+    # if this is a game_info_lite_response, make sure the game ID in the
     # response matches the game ID we have stored for this game. If not, mark
     # the game stale and return
     if data[0] == OPCODE_GAME_INFO_LITE_RESPONSE:
@@ -248,19 +234,6 @@ def game_info_response(data, address):
         # tracking, so go ahead and update the active_games entry for it.
         active_games[key].update(game_data)
 
-        # determine if we're talking to Rebirth or Retro
-        if 'variant' not in active_games[key]:
-            versions = (active_games[key]['release_major'],
-                        active_games[key]['release_minor'],
-                        active_games[key]['release_micro'],
-                        active_games[key]['netgame_proto'])
-            active_games[key]['variant'] = determine_variant(versions)
-
-        if (active_games[key]['variant'] == GAME_VARIANTS[0] or
-                active_games[key]['variant'] == GAME_VARIANTS[1]):
-            logger.debug('This appears to be a older variant')
-            active_games[key].update(LEGACY_GAME_TEMPLATE)
-
         # Capture approximate player join times
         for i in range(0, 8):
             player_name = 'player{0}name'.format(i)
@@ -309,7 +282,7 @@ def version_deny(address):
         logger.error('Unknown game version, dropping')
         return False
 
-    # check the net game protocol version to make sure we know how to decode
+    # check the netgame protocol version to make sure we know how to decode
     # the output. If not, set the version to unknown so we use just game info
     # lite requests.
     if game_data['netgame_proto'] in SUPPORTED_NETGAME_PROTO_VERSIONS:
@@ -567,15 +540,11 @@ MISSION_NAME_LENGTH = 25
 MAJOR_VERSION = 0
 MINOR_VERSION = 58
 MICRO_VERSION = 1
-SUPPORTED_NETGAME_PROTO_VERSIONS = (0, 2130, 2131)
+SUPPORTED_NETGAME_PROTO_VERSIONS = (2130, 2131, 2943)
 TRACKER_PROTOCOL_VERSION = 0
-GAME_VARIANTS = get_variants()
+
 NEW_GAME_TEMPLATE = {'confirmed': 0, 'pending_info_reqs': 0, 'start_time': 0,
-                     'detailed': 0, 'netgame_proto': 0,
-                     'main_tracker': 0}
-LEGACY_GAME_TEMPLATE = {'retro_proto': 0, 'alt_colors': 0, 'primary_dupe': 0,
-                        'secondary_dupe': 0, 'secondary_cap': 0,
-                        'born_burner': 0}
+                     'detailed': 0, 'netgame_proto': 0, 'main_tracker': 0}
 
 OPCODE_REGISTER = 0
 OPCODE_UNREGISTER_OR_VERSION_DENY = 1
@@ -642,7 +611,6 @@ while True:
             logger.info('Incoming packet from {0}:{1}, '
                         'data length: {2}'.format(address[0], address[1],
                         len(data)))
-            logger.debug('Raw data received: {0}'.format(data))
 
             if data:
                 if data[0] == OPCODE_REGISTER:
