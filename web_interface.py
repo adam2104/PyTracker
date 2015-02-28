@@ -120,8 +120,7 @@ def build_html_basic_stats(data):
 
     if data['start_time'] > 0:
         html_output += '<tr><td colspan=5 bgcolor=#D0D0D0 ><b>{0} - </b>' \
-                       'Start time: {1} GMT -    ' \
-                       '</td></tr>'.format(variant,
+                       'Start time: {1} GMT</td></tr>'.format(variant,
                                            my_time(data['start_time']))
     else:
         html_output += '<tr>' \
@@ -359,9 +358,9 @@ def build_html_detailed_stats(data, mode):
     # if D2, highlight burner option
     if data['version'] == 2:
         if data['born_burner'] == 1:
-            html_output += '<br><b>Spawn with burner: </b> Y'
+            html_output += '<b>Spawn with burner: </b> Y<br>'
         else:
-            html_output += '<br><b>Spawn with burner: </b> N'
+            html_output += '<b>Spawn with burner: </b> N<br>'
 
     # primaries dupe factor
     var = ''
@@ -633,14 +632,18 @@ def build_html_detailed_stats(data, mode):
 def build_html_footer(mode):
     html_output = '</td></tr>' \
                   '<tr><td><hr></td></tr>' \
-                  '<tr><td><font size=2>To use this tracker, configure \'<b>' \
+                  '<tr><td><font size=2>To use this tracker:<br>On Windows, ' \
+                  'configure \'<b>' \
                   '<i>-tracker_hostaddr retro-tracker.game-server.cc</b>' \
-                  '</i>\' in d1x.ini or d2x.ini, or add it to your D1X or ' \
-                  'D2X shortcut.<br>Games monitored by this tracker are ' \
+                  '</i>\' in d1x.ini' \
+                  '<br>On Mac OS X, configure \'<b><i>-tracker_hostaddr ' \
+                  'retro-tracker.game-server.cc</b></i>\' in /Users/your_user_name' \
+                  '/Library/Preferences/D1X Rebirth/d1x.ini' \
+                  '<br><br>Games monitored by this tracker are ' \
                   'archived ' \
                   '<a href="./archive/">here</a>.' \
-                  '<br>Created by: ' \
-                  '<a href="mailto:arch@a.gnslr.us">Arch</a>' \
+                  '<br>Created and maintained by: ' \
+                  '<a href="mailto:arch@a.gnslr.us">Arch</a><br><br>' \
                   '</td></tr>'
 
     # query the tracker status so we can update the page

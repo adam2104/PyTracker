@@ -6,3 +6,4 @@ dxx_client.py
 *.pyc
 tracker
 unit_test.py
+twitter_creds

@@ -9,6 +9,7 @@ import select
 import socket
 import threading
 import time
+import tweepy
 
 
 def check_version(major, minor, micro):
@@ -233,6 +234,25 @@ def game_info_response(data, address):
         # if we've made it here, this game must be the same one as the one we're
         # tracking, so go ahead and update the active_games entry for it.
         active_games[key].update(game_data)
+
+       # tweet about this new game
+        if (active_games[key]['tweet'] == 0) and isinstance(twitter, tweepy.API):
+            try:
+                tweet = 'Game - {0}\nMission: {1}\nMax Players: {2}\nStarted by: {3}'.format(
+                    active_games[key]['netgame_name'],
+                    active_games[key]['mission_title'],
+                    active_games[key]['max_players'],
+                    active_games[key]['player0name'])
+
+                twitter.update_status(status=tweet)
+                active_games[key]['tweet'] = 1
+            except tweepy.TweepError:
+                logger.exception('Unable to send tweet')
+                # give up on tweeting about this one, twitter api limits
+                active_games[key]['tweet'] = 1
+        else:
+            logger.debug('We already tweeted about this game, '
+                         'or twitter support disabled')
 
         # Capture approximate player join times
         for i in range(0, 8):
@@ -494,6 +514,7 @@ parser.add_argument('--peer_hostname', dest='peer_hostname',
 parser.add_argument('--peer_port', dest='peer_port',
                     help='Port of peer tracker to query for games list '
                          '(default: 42420)', default=42420)
+parser.add_argument('--twitter', dest='twitter', help='Tweet new games', action='store_true')
 args = parser.parse_args()
 
 int_ip_list = []
@@ -532,6 +553,31 @@ if args.peer_hostname:
 else:
     peer_address = False
 
+if args.twitter:
+    twitter_creds = my_load_file('twitter_creds')
+    if twitter_creds:
+        # check for required fields
+        if (('consumer_key' not in twitter_creds) or
+                ('consumer_secret' not in twitter_creds) or
+                ('access_token' not in twitter_creds) or
+                ('access_token_secret' not in twitter_creds)):
+            logger.error('Credentials missing')
+            twitter = False
+        else:
+            # init twitter connection
+            auth = tweepy.OAuthHandler(twitter_creds['consumer_key'],
+                                       twitter_creds['consumer_secret'])
+            auth.secure = True
+            auth.set_access_token(twitter_creds['access_token'],
+                                  twitter_creds['access_token_secret'])
+            twitter = tweepy.API(auth)
+            logger.info('Successfully loaded twitter credentials file')
+    else:
+        logger.error('Unable to load twitter credentials file')
+        twitter =  False
+else:
+    twitter =  False
+
 # constants
 MAX_PLAYERS = 8
 CALLSIGN_LENGTH = 8
@@ -544,7 +590,8 @@ SUPPORTED_NETGAME_PROTO_VERSIONS = (2130, 2131, 2943)
 TRACKER_PROTOCOL_VERSION = 0
 
 NEW_GAME_TEMPLATE = {'confirmed': 0, 'pending_info_reqs': 0, 'start_time': 0,
-                     'detailed': 0, 'netgame_proto': 0, 'main_tracker': 0}
+                     'detailed': 0, 'netgame_proto': 0, 'main_tracker': 0,
+                     'tweet': 0}
 
 OPCODE_REGISTER = 0
 OPCODE_UNREGISTER_OR_VERSION_DENY = 1
