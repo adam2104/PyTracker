@@ -9,7 +9,6 @@ import select
 import socket
 import threading
 import time
-import tweepy
 
 
 def check_version(major, minor, micro):
@@ -236,20 +235,17 @@ def game_info_response(data, address):
         active_games[key].update(game_data)
 
        # tweet about this new game
-        if (active_games[key]['tweet'] == 0) and isinstance(twitter, tweepy.API):
-            try:
-                tweet = 'Game - {0}\nMission: {1}\nMax Players: {2}\nStarted by: {3}'.format(
-                    active_games[key]['netgame_name'],
-                    active_games[key]['mission_title'],
-                    active_games[key]['max_players'],
-                    active_games[key]['player0name'])
+        if (active_games[key]['tweet'] == 0):
+            tweet = 'Game start: {0} ({1}) ({2})\nMission: {3}\nHost: {4}'.format(
+                active_games[key]['netgame_name'],
+                my_determine_joinable(active_games[key]['flags'],
+                                      active_games[key]['refuse_players']),
+                active_games[key]['max_players'],
+                active_games[key]['mission_title'],
+                active_games[key]['player0name'])
 
-                twitter.update_status(status=tweet)
-                active_games[key]['tweet'] = 1
-            except tweepy.TweepError:
-                logger.exception('Unable to send tweet')
-                # give up on tweeting about this one, twitter api limits
-                active_games[key]['tweet'] = 1
+            my_twitter_update_status(twitter, tweet)
+            active_games[key]['tweet'] = 1
         else:
             logger.debug('We already tweeted about this game, '
                          'or twitter support disabled')
@@ -554,27 +550,7 @@ else:
     peer_address = False
 
 if args.twitter:
-    twitter_creds = my_load_file('twitter_creds')
-    if twitter_creds:
-        # check for required fields
-        if (('consumer_key' not in twitter_creds) or
-                ('consumer_secret' not in twitter_creds) or
-                ('access_token' not in twitter_creds) or
-                ('access_token_secret' not in twitter_creds)):
-            logger.error('Credentials missing')
-            twitter = False
-        else:
-            # init twitter connection
-            auth = tweepy.OAuthHandler(twitter_creds['consumer_key'],
-                                       twitter_creds['consumer_secret'])
-            auth.secure = True
-            auth.set_access_token(twitter_creds['access_token'],
-                                  twitter_creds['access_token_secret'])
-            twitter = tweepy.API(auth)
-            logger.info('Successfully loaded twitter credentials file')
-    else:
-        logger.error('Unable to load twitter credentials file')
-        twitter =  False
+    twitter = my_init_twitter()
 else:
     twitter =  False
 

@@ -3,6 +3,7 @@ __author__ = 'Adam Gensler'
 from dxxtoolkit import dxx_sendto, dxx_unpack
 from my_functions import *
 from datetime import date
+import argparse
 import logging
 import logging.handlers
 import os
@@ -192,15 +193,8 @@ def build_html_basic_stats(data):
     var = ''
     if data['status'] == 4:
         var = 'Open'
-    elif (data['flags'] & 1) == 0 \
-            and data['refuse_players'] == 0:
-        var = 'Open'
-    elif (data['flags'] & 1) == 1:
-        var = 'Closed'
-    elif data['refuse_players'] == 1:
-        var = 'Restricted'
     else:
-        var = 'Unknown'
+        var = my_determine_joinable(data['flags'], data['refuse_players'])
     html_output += '<br><b>Joinable: </b>{0}'.format(var)
 
     if (data['flags'] & 4) == 4:
@@ -630,24 +624,24 @@ def build_html_detailed_stats(data, mode):
 
 
 def build_html_footer(mode):
-    html_output = '</td></tr>' \
-                  '<tr><td><hr></td></tr>' \
-                  '<tr><td><font size=2>To use this tracker:<br>On Windows, ' \
-                  'configure \'<b>' \
-                  '<i>-tracker_hostaddr retro-tracker.game-server.cc</b>' \
-                  '</i>\' in d1x.ini' \
-                  '<br>On Mac OS X, configure \'<b><i>-tracker_hostaddr ' \
-                  'retro-tracker.game-server.cc</b></i>\' in /Users/your_user_name' \
-                  '/Library/Preferences/D1X Rebirth/d1x.ini' \
-                  '<br><br>Games monitored by this tracker are ' \
-                  'archived ' \
-                  '<a href="./archive/">here</a>.' \
-                  '<br>Created and maintained by: ' \
-                  '<a href="mailto:arch@a.gnslr.us">Arch</a><br><br>' \
-                  '</td></tr>'
-
     # query the tracker status so we can update the page
     if mode == 'tracker':
+        html_output = '</td></tr>' \
+                      '<tr><td><hr></td></tr>' \
+                      '<tr><td><font size=2>To use this tracker:<br>On Windows, ' \
+                      'configure \'<b>' \
+                      '<i>-tracker_hostaddr retro-tracker.game-server.cc</b>' \
+                      '</i>\' in d1x.ini' \
+                      '<br>On Mac OS X, configure \'<b><i>-tracker_hostaddr ' \
+                      'retro-tracker.game-server.cc</b></i>\' in /Users/your_user_name' \
+                      '/Library/Preferences/D1X Rebirth/d1x.ini' \
+                      '<br><br>Games monitored by this tracker are ' \
+                      'archived ' \
+                      '<a href="{0}/archive">here</a>.' \
+                      '<br>Created and maintained by: ' \
+                      '<a href="mailto:arch@a.gnslr.us">Arch</a><br><br>' \
+                      '</td></tr>'.format(TRACKER_URL)
+
         if ping_tracker(('127.0.0.1', 42420)):
             html_output += '<tr>' \
                            '<td bgcolor=#00FF00>Tracker backend is UP' \
@@ -671,6 +665,15 @@ def build_html_footer(mode):
         html_output += '<tr>' \
                '<td>Last page refresh: {0} GMT' \
                '</td></tr>'.format(my_time(time.time()))
+    else:
+        html_output = '</td></tr>' \
+              '<tr><td><hr></td></tr>' \
+              '<tr><td><font size=2>Click ' \
+              '<a href="{0}/archive">here</a> to go back to the archived games list.' \
+              '<br>Click <a href="{0}">here</a> to go back to the main page.' \
+              '<br><br>Created and maintained by: ' \
+              '<a href="mailto:arch@a.gnslr.us">Arch</a>' \
+              '</td></tr>'.format(TRACKER_URL)
 
     html_output += '</font></table><br></td><td style=width:10% align=right></td></tr></table></body></html>'
 
@@ -698,6 +701,19 @@ rfh.setFormatter(formatter)
 logger.addHandler(rfh)
 logger.addHandler(ch)
 
+# handle command line arguments
+parser = argparse.ArgumentParser(description='Python-based DXX Tracker Web Interface',
+                                 prog='web_interface')
+parser.add_argument('--twitter', dest='twitter', help='Tweet about games', action='store_true')
+args = parser.parse_args()
+
+# enable twitter
+if args.twitter:
+    twitter = my_init_twitter()
+else:
+    twitter =  False
+
+TRACKER_URL = 'http://retro-tracker.game-server.cc'
 ITEM_LIST = ('Laser Upgrade', 'Quad Lasers', 'Vulcan Cannon', 'Vulcan Ammo',
              'Spreadfire Cannon', 'Plasma Cannon', 'Fusion Cannon',
              'Homing Missiles', 'Proximity Bombs', 'Smart Missiles',
@@ -720,6 +736,7 @@ while True:
     game_data = my_load_file('gamelist.txt')
 
     if game_data:
+        game_count = 0
         for i in game_data:
             #logger.debug('Active game data: \n{0}'.format(game_data[i]))
             if game_data[i]['confirmed']:
@@ -729,7 +746,11 @@ while True:
                     html_output += build_html_detailed_stats(game_data[i], 'tracker')
 
                 # close out this game's table
-                html_output += '</tr></table><br>'
+                html_output += '</tr></table>'
+
+                if game_count > 0:
+                    html_output += '<br>'
+                game_count += 1
 
     html_output += build_html_footer('tracker')
     my_write_file(html_output, 'tracker/index.html')
@@ -754,13 +775,29 @@ while True:
                                 game_data[i], 'archive')
 
                         # close out this game's table
-                        html_output += '</tr></table><br>'
+                        html_output += '</tr></table>'
+                        #html_output += '<br><font size=2>JSON (raw) formatted game data for ' \
+                        #               'this game is ' \
+                        #               '<a href="{0}/archive_data/old/{1}">here</a>.</font><br>'.format(TRACKER_URL, f)
                         html_output += build_html_footer('archive')
 
                         if my_write_file(html_output,
                                          'tracker/archive/{0}.html'.format(f)):
                             logger.debug('Wrote out archived game '
                                          '{0}'.format(filename))
+
+                           # tweet about this game ending, if we have detailed stats
+                            if game_data[i]['detailed']:
+                                tweet = 'Game end: {0}\n' \
+                                        'Mission: {1}\n' \
+                                        'Host: {2}\n' \
+                                        'Stats: {3}/archive/{4}.html'.format(
+                                    game_data[i]['netgame_name'],
+                                    game_data[i]['mission_title'],
+                                    game_data[i]['player0name'],
+                                    TRACKER_URL,
+                                    f)
+                                my_twitter_update_status(twitter, tweet)
                         else:
                             logger.debug('Error writing out '
                                          'archived game {0}'.format(filename))
