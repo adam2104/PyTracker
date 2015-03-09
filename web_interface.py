@@ -105,7 +105,7 @@ def build_html_header(mode):
     return html_output
 
 
-def build_html_basic_stats(data):
+def build_html_basic_stats(data, mode):
     logger.debug('entered build_html_basic_stats')
 
     html_output = '<table style=width:100% align=center cellspacing=0 ' \
@@ -173,20 +173,23 @@ def build_html_basic_stats(data):
 
     # status
     var = ''
-    if data['status'] == 0:
-        var = 'Menu'
-    elif data['status'] == 1:
-        var = 'Playing'
-    elif data['status'] == 2:
-        var = 'Browsing'
-    elif data['status'] == 3:
-        var = 'Waiting'
-    elif data['status'] == 4:
-        var = 'Starting'
-    elif data['status'] == 5:
-        var = 'End Level'
+    if mode == 'archive':
+        var = 'Archived'
     else:
-        var = 'Unknown'
+        if data['status'] == 0:
+            var = 'Menu'
+        elif data['status'] == 1:
+            var = 'Playing'
+        elif data['status'] == 2:
+            var = 'Browsing'
+        elif data['status'] == 3:
+            var = 'Waiting'
+        elif data['status'] == 4:
+            var = 'Starting'
+        elif data['status'] == 5:
+            var = 'End Level'
+        else:
+            var = 'Unknown'
     html_output += '<b>Status: </b>{0}'.format(var)
 
     # joinable
@@ -740,17 +743,17 @@ while True:
         for i in game_data:
             #logger.debug('Active game data: \n{0}'.format(game_data[i]))
             if game_data[i]['confirmed']:
-                html_output += build_html_basic_stats(game_data[i])
+                if game_count > 0:
+                    html_output += '<br>'
+
+                html_output += build_html_basic_stats(game_data[i], 'tracker')
+                game_count += 1
 
                 if game_data[i]['detailed']:
                     html_output += build_html_detailed_stats(game_data[i], 'tracker')
 
                 # close out this game's table
                 html_output += '</tr></table>'
-
-                if game_count > 0:
-                    html_output += '<br>'
-                game_count += 1
 
     html_output += build_html_footer('tracker')
     my_write_file(html_output, 'tracker/index.html')
@@ -768,7 +771,7 @@ while True:
                                  '\n{0}'.format(game_data[i]))
                     if game_data[i]['confirmed']:
                         html_output = build_html_header('archive')
-                        html_output += build_html_basic_stats(game_data[i])
+                        html_output += build_html_basic_stats(game_data[i], 'archive')
 
                         if game_data[i]['detailed']:
                             html_output += build_html_detailed_stats(
