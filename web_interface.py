@@ -51,29 +51,38 @@ def ping_tracker(address):
 def set_color(player_num, alt_colors):
     logger.debug('entered set_color')
     if player_num == 0:
+        # blue
         return '#7878B8'
     elif player_num == 1:
+        # red
         return '#D80000'
     elif player_num == 2:
+        # green
         return '#00B800'
     elif player_num == 3:
+        # pink
         return '#F058F8'
     elif player_num == 4:
+        # orange
         return '#F88000'
     elif player_num == 5:
         if alt_colors == 0:
+            # light orange
             return '#C08830'
         else:
+            # purple
             return '#7828C8'
     elif player_num == 6:
         if alt_colors == 0:
+            # light green
             return '#70A860'
         else:
-            return 'black'
+            # white, but the page background is white, so return black instead
+            return '#000000'
     elif player_num == 7:
         return '#E8E800'
     else:
-        return 'black'
+        return '#000000'
 
 
 def build_html_header(mode):

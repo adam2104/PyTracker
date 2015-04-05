@@ -3,6 +3,7 @@ __author__ = 'Adam Gensler'
 
 import logging
 import os
+import re
 import socket
 import struct
 
@@ -157,12 +158,9 @@ def dxx_process_game_info_response(data, version):
     if len(data) == 73:
         # game_info_lite response from DXX Rebirth and Retro
         game_data['game_id'] = unpacked_data[4]
-        game_data['netgame_name'] = unpacked_data[5].decode(errors='ignore').\
-            replace('\x00', '')
-        game_data['mission_title'] = unpacked_data[6].decode(errors='ignore').\
-            replace('\x00', '')
-        game_data['mission_name'] = unpacked_data[7].decode(errors='ignore').\
-            replace('\x00', '')
+        game_data['netgame_name'] = re.sub(r'[^a-zA-Z0-9]','',unpacked_data[5].decode(errors='ignore').replace('\x00', ''))
+        game_data['mission_title'] = re.sub(r'[^a-zA-Z0-9]','',unpacked_data[6].decode(errors='ignore').replace('\x00', ''))
+        game_data['mission_name'] = re.sub(r'[^a-zA-Z0-9]','',unpacked_data[7].decode(errors='ignore').replace('\x00', ''))
         game_data['level_num'] = unpacked_data[8]
         game_data['mode'] = unpacked_data[9]
         game_data['refuse_players'] = unpacked_data[10]
@@ -173,12 +171,9 @@ def dxx_process_game_info_response(data, version):
         game_data['flags'] = unpacked_data[15]
     else:
         # Full game_info response
-        game_data['netgame_name'] = unpacked_data[settings_offset].decode(errors='ignore').\
-            replace('\x00', '')
-        game_data['mission_title'] = unpacked_data[settings_offset+1].decode(errors='ignore').\
-            replace('\x00', '')
-        game_data['mission_name'] = unpacked_data[settings_offset+2].decode(errors='ignore').\
-            replace('\x00', '')
+        game_data['netgame_name'] = re.sub(r'[^a-zA-Z0-9]','',unpacked_data[settings_offset].decode(errors='ignore').replace('\x00', ''))
+        game_data['mission_title'] = re.sub(r'[^a-zA-Z0-9]','',unpacked_data[settings_offset+1].decode(errors='ignore').replace('\x00', ''))
+        game_data['mission_name'] = re.sub(r'[^a-zA-Z0-9]','',unpacked_data[settings_offset+2].decode(errors='ignore').replace('\x00', ''))
         game_data['level_num'] = unpacked_data[settings_offset+3]
         game_data['mode'] = unpacked_data[settings_offset+4]
         game_data['refuse_players'] = unpacked_data[settings_offset+5]
@@ -254,8 +249,7 @@ def dxx_process_game_info_response(data, version):
         if len(data) == 519 or len(data) == 520:
             for num in range(4, 36, 4):
                 plr_num = 'player{0}'.format(player_step)
-                game_data[plr_num + 'name'] = \
-                    (unpacked_data[num].decode(errors='ignore').split('\x00', 1))[0]
+                game_data[plr_num + 'name'] = re.sub(r'[^a-zA-Z0-9]','',(unpacked_data[num].decode(errors='ignore').split('\x00', 1))[0])
                 game_data[plr_num + 'connected'] = unpacked_data[num + 1]
                 game_data[plr_num + 'rank'] = unpacked_data[num + 2]
                 game_data[plr_num + 'deaths'] = unpacked_data[deaths_step]
@@ -277,8 +271,7 @@ def dxx_process_game_info_response(data, version):
         elif len(data) == 546:
             for num in range(4, 52, 6):
                 plr_num = 'player{0}'.format(player_step)
-                game_data[plr_num + 'name'] = \
-                    (unpacked_data[num].decode(errors='ignore').split('\x00', 1))[0]
+                game_data[plr_num + 'name'] = re.sub(r'[^a-zA-Z0-9]','',(unpacked_data[num].decode(errors='ignore').split('\x00', 1))[0])
                 game_data[plr_num + 'connected'] = unpacked_data[num + 1]
                 game_data[plr_num + 'rank'] = unpacked_data[num + 2]
                 game_data[plr_num + 'color'] = unpacked_data[num + 3]
