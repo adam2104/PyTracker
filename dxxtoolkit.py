@@ -139,6 +139,15 @@ def dxx_process_game_info_response(data, version):
                          'IIIIIIIIBBBBBBBBHBBBBBBBBBBBBBBB')
         # player data and settings are mingled together, might change over time
         settings_offset = 76
+    elif len(data) == 549 and version == 2:
+        # d2 retro 1.4X3
+        unpack_string = ('=BHHH9sBBBBB9sBBBBB9sBBBBB9sBBBBB9sBBBBB9sBBBBB9sBBBBB9sBBBBB9s'
+                         'BBBBB9sBBBBB9sBBBBB9sBBBBB16s26s9sIBBBBBBBBBIHHHHH18sII'
+                         'IIIIIIhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh'
+                         'hhhhhhhhhhhhhhhhhhhhhhhHhhhhhhhhhhhhhhhhhhIIIII'
+                         'IIIIIIIIBBBBBBBBHBBBBBBBBBBBBBBBBBB')
+        # player data and settings are mingled together, might change over time
+        settings_offset = 76
     else:
         logger.error('Received game info response with incorrect length')
         return False
@@ -233,10 +242,13 @@ def dxx_process_game_info_response(data, version):
             game_data['allow_colors'] = unpacked_data[settings_offset+147]
 
         # if this is d2 retro 1.4X3
-        if len(data) == 546 and version == 2:
-            game_data['dark_smarts'] = unpacked_data[settings_offset+146]
-            game_data['low_vulcan'] = unpacked_data[settings_offset+147]
-            game_data['allow_colors'] = unpacked_data[settings_offset+148]
+        if len(data) == 549 and version == 2:
+            game_data['dark_smarts'] = unpacked_data[settings_offset+145]
+            game_data['low_vulcan'] = unpacked_data[settings_offset+146]
+            game_data['allow_colors'] = unpacked_data[settings_offset+147]
+            game_data['born_burner'] = unpacked_data[settings_offset+148]
+            game_data['gauss_ammo_style'] = unpacked_data[settings_offset+149]
+            game_data['original_d1_weapons'] = unpacked_data[settings_offset+150]
 
         # player data offsets
         player_step = 0
@@ -268,7 +280,7 @@ def dxx_process_game_info_response(data, version):
                 suicides_step += 9
 
         # d1/d2 retro 1.4X3, player data
-        elif len(data) == 546:
+        elif len(data) == 546 or len(data) == 549:
             for num in range(4, 52, 6):
                 plr_num = 'player{0}'.format(player_step)
                 game_data[plr_num + 'name'] = re.sub(r'[^a-zA-Z0-9-_]','',(unpacked_data[num].decode(errors='ignore').split('\x00', 1))[0])

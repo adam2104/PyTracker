@@ -400,16 +400,26 @@ def build_html_detailed_stats(data, mode):
     if data['netgame_proto'] == 2943:
 
         # low vulcan ammo proto
-        if data['retro_proto'] > 1:
+        if data['low_vulcan'] == 1:
             html_output += '<br><b>Low Vulcan Ammo: </b> Y'
         else:
             html_output += '<br><b>Low Vulcan Ammo: </b> N'
 
         # custom colors
-        if data['allow_colors'] > 1:
+        if data['allow_colors'] == 1:
             html_output += '<br><b>Custom Colors: </b> Y'
         else:
             html_output += '<br><b>Custom Colors: </b> N'
+
+    # if this is retro 1.4 AND Descent2, display this data
+    if data['netgame_proto'] == 2943 and data['version'] == 2:
+        # d1 weapons
+        if data['original_d1_weapons'] == 1:
+            html_output += '<br><b>D1 Style Weapons: </b> Y'
+        else:
+            html_output += '<br><b>D1 Style Weapons: </b> N'
+
+
 
     # end column
     html_output += '</td>'
