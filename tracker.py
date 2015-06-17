@@ -28,7 +28,7 @@ def active_game_check(key):
     if key in active_games:
         return True
     else:
-        logger.error('Game hosted by {0} not found in '
+        logger.warning('Game hosted by {0} not found in '
                      'active_games'.format(key))
         return False
 
