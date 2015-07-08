@@ -5,7 +5,6 @@ import logging
 import os
 import socket
 import time
-import tweepy
 
 logger = logging.getLogger('dxx_logger.my_functions')
 
@@ -65,50 +64,6 @@ def my_gethostbyname(hostname):
         return socket.gethostbyname(hostname)
     except socket.error:
         logger.exception('Unable to resolve hostname')
-        return False
-
-
-def my_init_twitter():
-    logger.debug('entered my_init_twitter')
-
-    twitter_creds = my_load_file('twitter_creds')
-    if twitter_creds:
-        # check for required fields
-        if (('consumer_key' not in twitter_creds) or
-                ('consumer_secret' not in twitter_creds) or
-                ('access_token' not in twitter_creds) or
-                ('access_token_secret' not in twitter_creds)):
-            logger.error('Credentials missing')
-            twitter = False
-        else:
-            # init twitter connection
-            auth = tweepy.OAuthHandler(twitter_creds['consumer_key'],
-                                       twitter_creds['consumer_secret'])
-            auth.secure = True
-            auth.set_access_token(twitter_creds['access_token'],
-                                  twitter_creds['access_token_secret'])
-            twitter = tweepy.API(auth)
-            logger.info('Successfully loaded twitter credentials file')
-    else:
-        logger.error('Unable to load twitter credentials file')
-        twitter =  False
-
-    return twitter
-
-
-def my_twitter_update_status(api, tweet):
-    logger.debug('entered my_twitter_update_status')
-
-    # check to make sure the API passed in is actually a tweepy API
-    if isinstance(api, tweepy.API):
-        try:
-            api.update_status(status=tweet)
-            logger.debug('Successfully sent tweet')
-            return True
-        except tweepy.TweepError:
-            logger.exception('Unable to send tweet')
-            return False
-    else:
         return False
 
 def my_determine_joinable(flags, refuse_players):

@@ -234,22 +234,6 @@ def game_info_response(data, address):
         # tracking, so go ahead and update the active_games entry for it.
         active_games[key].update(game_data)
 
-       # tweet about this new game
-        if (active_games[key]['tweet'] == 0):
-            tweet = 'Game start: {0} ({1}) ({2})\nMission: {3}\nHost: {4}'.format(
-                active_games[key]['netgame_name'],
-                my_determine_joinable(active_games[key]['flags'],
-                                      active_games[key]['refuse_players']),
-                active_games[key]['max_players'],
-                active_games[key]['mission_title'],
-                active_games[key]['player0name'])
-
-            my_twitter_update_status(twitter, tweet)
-            active_games[key]['tweet'] = 1
-        else:
-            logger.debug('We already tweeted about this game, '
-                         'or twitter support disabled')
-
         # Capture approximate player join times
         for i in range(0, 8):
             player_name = 'player{0}name'.format(i)
@@ -510,7 +494,6 @@ parser.add_argument('--peer_hostname', dest='peer_hostname',
 parser.add_argument('--peer_port', dest='peer_port',
                     help='Port of peer tracker to query for games list '
                          '(default: 42420)', default=42420)
-parser.add_argument('--twitter', dest='twitter', help='Tweet new games', action='store_true')
 args = parser.parse_args()
 
 int_ip_list = []
@@ -548,11 +531,6 @@ if args.peer_hostname:
                      'again later')
 else:
     peer_address = False
-
-if args.twitter:
-    twitter = my_init_twitter()
-else:
-    twitter =  False
 
 # constants
 MAX_PLAYERS = 8

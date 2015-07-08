@@ -726,14 +726,7 @@ logger.addHandler(ch)
 # handle command line arguments
 parser = argparse.ArgumentParser(description='Python-based DXX Tracker Web Interface',
                                  prog='web_interface')
-parser.add_argument('--twitter', dest='twitter', help='Tweet about games', action='store_true')
 args = parser.parse_args()
-
-# enable twitter
-if args.twitter:
-    twitter = my_init_twitter()
-else:
-    twitter =  False
 
 TRACKER_URL = 'http://retro-tracker.game-server.cc'
 ITEM_LIST = ('Laser Upgrade', 'Quad Lasers', 'Vulcan Cannon', 'Vulcan Ammo',
@@ -807,19 +800,6 @@ while True:
                                          'tracker/archive/{0}.html'.format(f)):
                             logger.debug('Wrote out archived game '
                                          '{0}'.format(filename))
-
-                           # tweet about this game ending, if we have detailed stats
-                            if game_data[i]['detailed']:
-                                tweet = 'Game end: {0}\n' \
-                                        'Mission: {1}\n' \
-                                        'Host: {2}\n' \
-                                        'Stats: {3}/archive/{4}.html'.format(
-                                    game_data[i]['netgame_name'],
-                                    game_data[i]['mission_title'],
-                                    game_data[i]['player0name'],
-                                    TRACKER_URL,
-                                    f)
-                                my_twitter_update_status(twitter, tweet)
                         else:
                             logger.debug('Error writing out '
                                          'archived game {0}'.format(filename))
