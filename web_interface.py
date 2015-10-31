@@ -85,14 +85,18 @@ def set_color(player_num, alt_colors):
         return '#000000'
 
 
-def build_html_header(mode):
+def build_html_header(mode, game_count):
     html_output = '<html><head>'
 
     if mode == 'tracker':
         html_output += '<meta http-equiv="refresh" content="60">'
 
-    html_output += '<title>DXX Retro Tracker</title>' \
-                   '<STYLE TYPE="text/css">' \
+    if game_count > 0:
+        html_output += '<title>DXX Retro Tracker ({0})</title>'.format(game_count)
+    else:
+        html_output += '<title>DXX Retro Tracker</title>'
+    
+    html_output += '<STYLE TYPE="text/css">' \
                    '<!--TD{font-family: Arial;}--->' \
                    '</STYLE></head>' \
                    '<body bgcolor=#D0D0D0>' \
@@ -754,8 +758,8 @@ last_list_response_time = 0
 archived_count = 0
 
 while True:
-    html_output = build_html_header('tracker')
     game_data = my_load_file('gamelist.txt')
+    temp_html_output = ''
 
     if game_data:
         game_count = 0
@@ -763,17 +767,19 @@ while True:
             #logger.debug('Active game data: \n{0}'.format(game_data[i]))
             if game_data[i]['confirmed']:
                 if game_count > 0:
-                    html_output += '<br>'
+                    temp_html_output += '<br>'
 
-                html_output += build_html_basic_stats(game_data[i], 'tracker')
+                temp_html_output += build_html_basic_stats(game_data[i], 'tracker')
                 game_count += 1
 
                 if game_data[i]['detailed']:
-                    html_output += build_html_detailed_stats(game_data[i], 'tracker')
+                    temp_html_output += build_html_detailed_stats(game_data[i], 'tracker')
 
                 # close out this game's table
-                html_output += '</tr></table>'
+                temp_html_output += '</tr></table>'
 
+    html_output = build_html_header('tracker', game_count)
+    html_output += temp_html_output
     html_output += build_html_footer('tracker')
     my_write_file(html_output, 'tracker/index.html')
 
