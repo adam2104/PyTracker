@@ -760,9 +760,9 @@ archived_count = 0
 while True:
     game_data = my_load_file('gamelist.txt')
     temp_html_output = ''
+    game_count = 0
 
     if game_data:
-        game_count = 0
         for i in game_data:
             #logger.debug('Active game data: \n{0}'.format(game_data[i]))
             if game_data[i]['confirmed']:
