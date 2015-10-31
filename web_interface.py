@@ -92,7 +92,7 @@ def build_html_header(mode, game_count):
         html_output += '<meta http-equiv="refresh" content="60">'
 
     if game_count > 0:
-        html_output += '<title>DXX Retro Tracker ({0})</title>'.format(game_count)
+        html_output += '<title>({0}) DXX Retro Tracker</title>'.format(game_count)
     else:
         html_output += '<title>DXX Retro Tracker</title>'
     
