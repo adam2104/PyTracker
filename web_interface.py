@@ -795,7 +795,7 @@ while True:
                     logger.debug('Archive game data: '
                                  '\n{0}'.format(game_data[i]))
                     if game_data[i]['confirmed']:
-                        html_output = build_html_header('archive')
+                        html_output = build_html_header('archive', 0)
                         html_output += build_html_basic_stats(game_data[i], 'archive')
 
                         if game_data[i]['detailed']:
