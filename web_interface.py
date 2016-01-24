@@ -96,17 +96,51 @@ def build_html_header(mode, game_count):
     else:
         html_output += '<title>DXX Retro Tracker</title>'
     
+    html_output += '<script>' \
+                   'var expanded = [];' \
+                   'function toggle(id) {' \
+                   '    var e = document.getElementById("game" + id);' \
+                   '    if (e === undefined)' \
+                   '        return;' \
+                   '    if (e.style.display == "block") {' \
+                   '        if (expanded.indexOf(id) !== -1)' \
+                   '            expanded.splice(expanded.indexOf(id), 1);' \
+                   '        e.style.display = "none";' \
+                   '    } else {' \
+                   '        if (expanded.indexOf(id) === -1)' \
+                   '            expanded.push(id);' \
+                   '        e.style.display = "block";' \
+                   '    }' \
+                   '    document.cookie = "expanded=" + expanded.join(",");' \
+                   '}' \
+                   'function onload() {' \
+                   '    var str = document.cookie;' \
+                   '    if (str === "")' \
+                   '        return;' \
+                   '    var cookiestr = str.split("=")[1];' \
+                   '    if (cookiestr === "")' \
+                   '        return;' \
+                   '    var cookie = cookiestr.split(",");' \
+                   '    for (var i = 0; i < cookie.length; i++) {' \
+                   '        toggle(cookie[i]);' \
+                   '    }' \
+                   '}' \
+                   '</script>'
+    
     html_output += '<STYLE TYPE="text/css">' \
-                   '<!--TD{font-family: Arial;}--->' \
+                   '<!--' \
+                   'TD{font-family: Arial;}' \
+                   '.scoreboard_game{width: 250px; cursor: pointer; display: inline-block; vertical-align: top; margin: 0 20px 20px 0;}' \
+                   '--->' \
                    '</STYLE></head>' \
-                   '<body bgcolor=#D0D0D0>' \
+                   '<body bgcolor=#D0D0D0 onload=onload();>' \
                    '<table style=width:100% align=center>' \
                    '<tr>' \
                    '<td style=width:10% align=left></td>' \
                    '<td style=width:80% align=center bgcolor=#FFFFFF>' \
                    '<table style=width:95% bgcolor=#FFFFFF>' \
                    '<tr>' \
-                   '<td align=center><br>DXX Retro Tracker</td>' \
+                   '<td align=center><br><b>DXX Retro Tracker</b><br />Click on a game to get detailed score board information.</td>' \
                    '</tr>' \
                    '<tr>' \
                    '<td><hr></td>' \
@@ -118,11 +152,68 @@ def build_html_header(mode, game_count):
     return html_output
 
 
+def build_html_scoreboard(data, mode):
+    logger.debug('entered build_html_scoreboard')
+    
+    html_output = '<div onclick=toggle("{0}"); class=scoreboard_game>'.format(data['game_id'])
+    
+    html_output += '<table style=width:100% align=center cellspacing=0 ' \
+                  'border=1>'
+
+    html_output += '<tr><td bgcolor=#D0D0D0><b>D{0} {1}</b></td></tr>'.format(data['version'],
+                                                                              data['mission_title'])
+    
+    html_output += '<tr><td><table style=width:100% cellspacing=0>'
+
+    html_output += '<tr><td colspan=2><b>Game Name: </b>{0}</td></tr>'.format(data['netgame_name'])
+
+    if game_data[i]['detailed']:
+        # build a sorted list of players based on number of kills so we can
+        # display the scoreboard in that order
+        sorted_players = {}
+        for x in range(0, 8):
+            player = 'player{0}'.format(str(x))
+            sorted_players[x] = data[player + 'kills']
+        sorted_players = sorted(sorted_players,
+                                key=sorted_players.get,
+                                reverse=True)
+    
+        total_players = 0
+        for x in range(0, 8):
+            player = 'player{0}'.format(str(sorted_players[x]))
+            name = data[player + 'name']
+            if len(name) > 0:
+                total_players += 1
+    
+                # if this is a team game, set the text_color
+                if data['team_vector'] > 0:
+                    team_num = (data['team_vector'] & 2**sorted_players[x]) \
+                            >> sorted_players[x]
+                    text_color = set_color(team_num, data['alt_colors'])
+                else:
+                    text_color = set_color(sorted_players[x], data['alt_colors'])
+    
+                # start row
+                html_output += '<tr style="color:{0};">'.format(text_color)
+    
+                html_output += '<td>' + name + '</td>'
+    
+                html_output += '<td>{0}</td>'.format(
+                    str(data[player + 'kills']))
+    
+                html_output += '</tr>'
+
+    html_output += '</table></td></tr></table>'
+
+    html_output += '</div>'
+
+    return html_output
+
 def build_html_basic_stats(data, mode):
     logger.debug('entered build_html_basic_stats')
 
-    html_output = '<table style=width:100% align=center cellspacing=0 ' \
-                  'border=1>'
+    html_output = '<table style=width:100%;display:none; align=center cellspacing=0 ' \
+                  'border=1 id=game{0}>'.format(data['game_id'])
 
     # determine which version this is
     if data['netgame_proto'] == 2130 or data['netgame_proto'] == 2131:
@@ -764,10 +855,13 @@ while True:
 
     if game_data:
         for i in game_data:
+            if game_data[i]['confirmed']:
+                temp_html_output += build_html_scoreboard(game_data[i], 'tracker')
+
+        for i in game_data:
             #logger.debug('Active game data: \n{0}'.format(game_data[i]))
             if game_data[i]['confirmed']:
-                if game_count > 0:
-                    temp_html_output += '<br>'
+                temp_html_output += '<br>'
 
                 temp_html_output += build_html_basic_stats(game_data[i], 'tracker')
                 game_count += 1
