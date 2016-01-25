@@ -139,9 +139,14 @@ def build_html_header(mode, game_count):
                    '<td style=width:10% align=left></td>' \
                    '<td style=width:80% align=center bgcolor=#FFFFFF>' \
                    '<table style=width:95% bgcolor=#FFFFFF>' \
-                   '<tr>' \
-                   '<td align=center><br><b>DXX Retro Tracker</b><br />Click on a game to get detailed score board information.</td>' \
-                   '</tr>' \
+                   '<tr>'
+
+    if mode == 'tracker':
+        html_output += '<td align=center><br><b>DXX Retro Tracker</b><br />Click on a game to get detailed score board information.</td>'
+    else:
+        html_output += '<td align=center><br><b>DXX Retro Tracker</b></td>'
+
+    html_output += '</tr>' \
                    '<tr>' \
                    '<td><hr></td>' \
                    '</tr>'
@@ -212,8 +217,11 @@ def build_html_scoreboard(data, mode):
 def build_html_basic_stats(data, mode):
     logger.debug('entered build_html_basic_stats')
 
-    html_output = '<table style=width:100%;display:none; align=center cellspacing=0 ' \
-                  'border=1 id=game{0}>'.format(data['game_id'])
+    if mode == 'tracker':
+        html_output = '<table style=width:100%;display:none; align=center cellspacing=0 ' \
+                      'border=1 id=game{0}>'.format(data['game_id'])
+    else:
+        html_output = '<table style=width:100%; align=center cellspacing=0 border=1>'
 
     # determine which version this is
     if data['netgame_proto'] == 2130 or data['netgame_proto'] == 2131:
