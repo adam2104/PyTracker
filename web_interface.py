@@ -98,6 +98,19 @@ def build_html_header(mode, game_count):
     
     html_output += '<script>' \
                    'var expanded = [];' \
+                   'function setCookie() {' \
+                   '    document.cookie = "scoreboard=" + (document.body.className.length > 0 ? "off" : "on");' \
+                   '    if (expanded.length > 0)' \
+                   '        document.cookie = "expanded=" + expanded.join(",");' \
+                   '}' \
+                   'function toggleScoreboard() {' \
+                   '    var e = document.getElementById("scoreboardmode");' \
+                   '    if (e.checked)' \
+                   '        document.body.className = "";' \
+                   '    else' \
+                   '        document.body.className = "scoreboard_off";' \
+                   '    setCookie();' \
+                   '}' \
                    'function toggle(id) {' \
                    '    var e = document.getElementById("game" + id);' \
                    '    if (e === undefined)' \
@@ -111,16 +124,24 @@ def build_html_header(mode, game_count):
                    '            expanded.push(id);' \
                    '        e.style.display = "block";' \
                    '    }' \
-                   '    document.cookie = "expanded=" + expanded.join(",");' \
+                   '    setCookie();' \
                    '}' \
                    'function onload() {' \
-                   '    var str = document.cookie;' \
-                   '    if (str === "")' \
+                   '    var cookies = document.cookie.split("; ");' \
+                   '    var obj = {};' \
+                   '    for (var key in cookies) {' \
+                   '        var cookiestr = cookies[key].split("=");' \
+                   '        obj[cookiestr[0]] = cookiestr[1];' \
+                   '    }' \
+                   '    if (obj.scoreboard === "on") {' \
+                   '        document.body.className = "";' \
+                   '        document.getElementById("scoreboardmode").checked = true;' \
+                   '    }' \
+                   '    if (!obj.expanded)' \
                    '        return;' \
-                   '    var cookiestr = str.split("=")[1];' \
-                   '    if (cookiestr === "")' \
+                   '    if (obj.expanded === "")' \
                    '        return;' \
-                   '    var cookie = cookiestr.split(",");' \
+                   '    var cookie = obj.expanded.split(",");' \
                    '    for (var i = 0; i < cookie.length; i++) {' \
                    '        toggle(cookie[i]);' \
                    '    }' \
@@ -131,9 +152,12 @@ def build_html_header(mode, game_count):
                    '<!--' \
                    'TD{font-family: Arial;}' \
                    '.scoreboard_game{width: 250px; cursor: pointer; display: inline-block; vertical-align: top; margin: 0 20px 20px 0;}' \
+                   '.scoreboard_off .scoreboard_game{display: none;}' \
+                   '.scoreboard_off .scoreboard_details{display: block !important;}' \
+                   '.scoreboard_off .scoreboard_instructions{display: none;}' \
                    '--->' \
                    '</STYLE></head>' \
-                   '<body bgcolor=#D0D0D0 onload=onload();>' \
+                   '<body bgcolor=#D0D0D0 class=scoreboard_off onload=onload();>' \
                    '<table style=width:100% align=center>' \
                    '<tr>' \
                    '<td style=width:10% align=left></td>' \
@@ -142,7 +166,11 @@ def build_html_header(mode, game_count):
                    '<tr>'
 
     if mode == 'tracker':
-        html_output += '<td align=center><br><b>DXX Retro Tracker</b><br />Click on a game to get detailed score board information.</td>'
+        html_output += '<td align=center>' \
+                       '<br><b>DXX Retro Tracker</b><br />' \
+                       '<input type=checkbox id=scoreboardmode onclick=toggleScoreboard(); /> Scoreboard mode' \
+                       '<span class=scoreboard_instructions><br />Click on a game to get detailed score board information.</span>' \
+                       '</td>'
     else:
         html_output += '<td align=center><br><b>DXX Retro Tracker</b></td>'
 
@@ -219,7 +247,7 @@ def build_html_basic_stats(data, mode):
 
     if mode == 'tracker':
         html_output = '<table style=width:100%;display:none; align=center cellspacing=0 ' \
-                      'border=1 id=game{0}>'.format(data['game_id'])
+                      'border=1 class=scoreboard_details id=game{0}>'.format(data['game_id'])
     else:
         html_output = '<table style=width:100%; align=center cellspacing=0 border=1>'
 
