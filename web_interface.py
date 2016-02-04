@@ -102,6 +102,8 @@ def build_html_header(mode, game_count):
                    '    document.cookie = "scoreboard=" + (document.body.className.length > 0 ? "off" : "on");' \
                    '    if (expanded.length > 0)' \
                    '        document.cookie = "expanded=" + expanded.join(",");' \
+                   '    else' \
+                   '        document.cookie = "expanded=0;expires=" + new Date(2000, 1, 1).toGMTString();' \
                    '}' \
                    'function toggleScoreboard() {' \
                    '    var e = document.getElementById("scoreboardmode");' \
