@@ -977,23 +977,36 @@ while True:
 
         archive_index = '<html><head><title>DXX Tracker Archive</title>' \
                         '</head><body>'
+        
+        count = 0
 
         # game archives that span years, 2014, 2015, etc, will be sorted
         # strangely, so, look for games, starting with 2014, until the
         # current year
         for year in reversed(range(2014, date.today().year + 1)):
             for i in archived_games:
+                count += 1
                 regex_string = r'game-[0-9]{2}-[0-9]{2}-' + str(year) + '-'
                 if re.match(regex_string, i):
                     archive_index += '<a href="./{0}">{0}</a><br>'.format(i)
+                if count == 100:
+                    short_archive_index = archive_index
+                    short_archive_index += '<a href="./full.html">Show more games</a>'
+                    short_archive_index += '</body></html>'
+                    
+                    filename = 'tracker/archive/index.html'
+                    if my_write_file(short_archive_index, filename):
+                        logger.debug('Wrote out archive index')
+                    else:
+                        logger.debug('Error writing out archive index')
 
         archive_index += '</body></html>'
 
-        filename = 'tracker/archive/index.html'
+        filename = 'tracker/archive/full.html'
         if my_write_file(archive_index, filename):
-            logger.debug('Wrote out archive index')
+            logger.debug('Wrote out full archive index')
         else:
-            logger.debug('Error writing out archive index')
+            logger.debug('Error writing out full archive index')
 
         archived_count = len(archived_games)
 
