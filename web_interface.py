@@ -985,20 +985,21 @@ while True:
         # current year
         for year in reversed(range(2014, date.today().year + 1)):
             for i in archived_games:
-                count += 1
                 regex_string = r'game-[0-9]{2}-[0-9]{2}-' + str(year) + '-'
                 if re.match(regex_string, i):
+                    count += 1
                     archive_index += '<a href="./{0}">{0}</a><br>'.format(i)
-                if count == 100:
-                    short_archive_index = archive_index
-                    short_archive_index += '<a href="./full.html">Show more games</a>'
-                    short_archive_index += '</body></html>'
+                
+                    if count == 100:
+                        short_archive_index = archive_index
+                        short_archive_index += '<a href="./full.html">Show more games</a>'
+                        short_archive_index += '</body></html>'
                     
-                    filename = 'tracker/archive/index.html'
-                    if my_write_file(short_archive_index, filename):
-                        logger.debug('Wrote out archive index')
-                    else:
-                        logger.debug('Error writing out archive index')
+                        filename = 'tracker/archive/index.html'
+                        if my_write_file(short_archive_index, filename):
+                            logger.debug('Wrote out archive index')
+                        else:
+                            logger.debug('Error writing out archive index')
 
         archive_index += '</body></html>'
 
