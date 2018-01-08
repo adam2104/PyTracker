@@ -536,7 +536,7 @@ def build_html_detailed_stats(data, mode):
     html_output += '<br><b>Secondary Cap: </b>{0}'.format(var)
 
     # if retro 1.4, display this data
-    if data['netgame_proto'] == 2943 or data['netgame_proto'] == 2944 or data['netgame_proto'] == 2945 of data['netgame_proto'] == 2946:
+    if data['netgame_proto'] == 2943 or data['netgame_proto'] == 2944 or data['netgame_proto'] == 2945 or data['netgame_proto'] == 2946:
 
         # low vulcan ammo proto
         if data['low_vulcan'] == 1:
